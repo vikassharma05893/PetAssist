@@ -74,56 +74,48 @@ Keep it short.
 
 
 // ================= WHATSAPP ROUTE (FIXED) =================
-app.post("/whatsapp", async (req, res) => {
+app.post("/whatsapp", (req, res) => {
   try {
     const userMessage = req.body.Body || "Hi";
 
     console.log("Incoming WhatsApp:", userMessage);
 
-    logQuery(userMessage);
-
-    // ✅ TEMP: Avoid crashing Google API
-    const vetList = "Find nearby vets:\nhttps://www.google.com/maps/search/veterinary+clinic";
-
-    let aiReply = "Hello! How can I help your pet today?";
-
-    try {
-      const response = await axios.post(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          model: "gpt-4o-mini",
-          messages: [
-            { role: "system", content: "You are a pet health assistant. Keep it short." },
-            { role: "user", content: userMessage },
-          ],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      aiReply = response.data.choices[0].message.content;
-
-    } catch (e) {
-      console.log("OpenAI error:", e.message);
-    }
-
-    const finalReply = `${aiReply}\n\n🏥 ${vetList}`;
-
-    const safeReply = finalReply
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    // ✅ INSTANT RESPONSE (no waiting)
+    const reply = "🐾 Got your message! Checking your pet's condition...";
 
     res.set("Content-Type", "text/xml");
     res.send(`
 <Response>
-<Message>${safeReply}</Message>
+<Message>${reply}</Message>
 </Response>
     `);
+
+    // ✅ Run AI in background (does not block Twilio)
+    setTimeout(async () => {
+      try {
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
+          {
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: "You are a pet health assistant." },
+              { role: "user", content: userMessage },
+            ],
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        console.log("AI Response:", response.data.choices[0].message.content);
+
+      } catch (e) {
+        console.log("Background AI error:", e.message);
+      }
+    }, 0);
 
   } catch (error) {
     console.error("FINAL ERROR:", error);
