@@ -4,6 +4,7 @@ const express = require("express");
 const axios = require("axios");
 const logQuery = require("./logger");
 const { getRecommendations, extractLocation } = require("./logic");
+// ❌ Temporarily not using getNearbyVets in WhatsApp route
 const getNearbyVets = require("./vets");
 
 const app = express();
@@ -55,7 +56,6 @@ Keep it short.
       },
       {
         headers: {
-          // ✅ FIXED HERE
           Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
@@ -73,47 +73,47 @@ Keep it short.
 });
 
 
-// ================= WHATSAPP ROUTE =================
+// ================= WHATSAPP ROUTE (FIXED) =================
 app.post("/whatsapp", async (req, res) => {
   try {
     const userMessage = req.body.Body || "Hi";
 
-    console.log("Incoming WhatsApp:", req.body);
+    console.log("Incoming WhatsApp:", userMessage);
 
     logQuery(userMessage);
 
-    const { cost, vet, food } = getRecommendations(userMessage);
-    const location = extractLocation(userMessage);
-    const vets = await getNearbyVets(location);
+    // ✅ TEMP: Avoid crashing Google API
+    const vetList = "Find nearby vets:\nhttps://www.google.com/maps/search/veterinary+clinic";
 
-    const vetList = vets.length > 0
-      ? vets.map(v => `• ${v.name} ⭐ ${v.rating}\n${v.link}`).join("\n\n")
-      : "No nearby vets found";
+    let aiReply = "Hello! How can I help your pet today?";
 
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a pet health assistant. Keep answers short and helpful.`,
-          },
-          { role: "user", content: userMessage },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
+    try {
+      const response = await axios.post(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: "You are a pet health assistant. Keep it short." },
+            { role: "user", content: userMessage },
+          ],
         },
-      }
-    );
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-    const aiReply = response.data.choices[0].message.content;
+      aiReply = response.data.choices[0].message.content;
 
-    // ✅ XML safe
-    const safeReply = aiReply
+    } catch (e) {
+      console.log("OpenAI error:", e.message);
+    }
+
+    const finalReply = `${aiReply}\n\n🏥 ${vetList}`;
+
+    const safeReply = finalReply
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
@@ -126,12 +126,12 @@ app.post("/whatsapp", async (req, res) => {
     `);
 
   } catch (error) {
-    console.error("WhatsApp Error:", error.message);
+    console.error("FINAL ERROR:", error);
 
     res.set("Content-Type", "text/xml");
     res.send(`
 <Response>
-<Message>⚠️ Error. Please try again.</Message>
+<Message>Server error</Message>
 </Response>
     `);
   }
