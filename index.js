@@ -106,7 +106,7 @@ You are a pet health assistant. Keep answers short and helpful.
       },
       {
         headers: {
-          Authorization: \`Bearer \${process.env.OPENAI_API_KEY}\`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
       }
