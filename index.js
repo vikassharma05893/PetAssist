@@ -55,7 +55,8 @@ Keep it short.
       },
       {
         headers: {
-          Authorization: \`Bearer \${process.env.OPENAI_API_KEY}\`,
+          // ✅ FIXED HERE
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json",
         },
       }
@@ -75,7 +76,6 @@ Keep it short.
 // ================= WHATSAPP ROUTE =================
 app.post("/whatsapp", async (req, res) => {
   try {
-    // ✅ FIX 1: fallback (prevents crash)
     const userMessage = req.body.Body || "Hi";
 
     console.log("Incoming WhatsApp:", req.body);
@@ -97,9 +97,7 @@ app.post("/whatsapp", async (req, res) => {
         messages: [
           {
             role: "system",
-            content: `
-You are a pet health assistant. Keep answers short and helpful.
-`,
+            content: `You are a pet health assistant. Keep answers short and helpful.`,
           },
           { role: "user", content: userMessage },
         ],
@@ -114,8 +112,11 @@ You are a pet health assistant. Keep answers short and helpful.
 
     const aiReply = response.data.choices[0].message.content;
 
-    // ✅ FIX 2: Clean XML-safe response
-    const safeReply = aiReply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // ✅ XML safe
+    const safeReply = aiReply
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
     res.set("Content-Type", "text/xml");
     res.send(`
@@ -147,5 +148,5 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(\`Server running on port \${PORT}\`);
+  console.log(`Server running on port ${PORT}`);
 });
