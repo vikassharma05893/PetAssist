@@ -8,7 +8,7 @@ const getNearbyVets = require("./vets");
 
 const app = express();
 
-// ✅ Needed for Twilio (form data)
+// ✅ Needed for Twilio
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
@@ -38,31 +38,16 @@ app.post("/test", async (req, res) => {
             content: `
 You are a pet health assistant.
 
-Always respond in this EXACT format:
+Format:
+🧠 Issue
+🚨 Severity
+📋 Steps
+🏥 Vet
+💰 Cost
+🍗 Food
+⚠️ Warning
 
-🧠 Issue: (short diagnosis)
-🚨 Severity: (Low / Medium / High)
-
-📋 What to do:
-- Step 1
-- Step 2
-- Step 3
-
-🏥 Recommended Vet: ${vet}
-
-🏥 Nearby Vets:
-${vetList}
-
-💰 Estimated Cost: ${cost}
-🍗 Food Advice: ${food}
-
-⚠️ When to see a vet:
-(short condition)
-
-Rules:
-- Keep answers short
-- Be practical
-- No long paragraphs
+Keep it short.
 `,
           },
           { role: "user", content: userMessage },
@@ -70,7 +55,7 @@ Rules:
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: \`Bearer \${process.env.OPENAI_API_KEY}\`,
           "Content-Type": "application/json",
         },
       }
@@ -90,7 +75,10 @@ Rules:
 // ================= WHATSAPP ROUTE =================
 app.post("/whatsapp", async (req, res) => {
   try {
-    const userMessage = req.body.Body;
+    // ✅ FIX 1: fallback (prevents crash)
+    const userMessage = req.body.Body || "Hi";
+
+    console.log("Incoming WhatsApp:", req.body);
 
     logQuery(userMessage);
 
@@ -99,7 +87,7 @@ app.post("/whatsapp", async (req, res) => {
     const vets = await getNearbyVets(location);
 
     const vetList = vets.length > 0
-      ? vets.map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`).join("\n\n")
+      ? vets.map(v => `• ${v.name} ⭐ ${v.rating}\n${v.link}`).join("\n\n")
       : "No nearby vets found";
 
     const response = await axios.post(
@@ -110,28 +98,7 @@ app.post("/whatsapp", async (req, res) => {
           {
             role: "system",
             content: `
-You are a pet health assistant.
-
-Always respond in this EXACT format:
-
-🧠 Issue: (short diagnosis)
-🚨 Severity: (Low / Medium / High)
-
-📋 What to do:
-- Step 1
-- Step 2
-- Step 3
-
-🏥 Recommended Vet: ${vet}
-
-🏥 Nearby Vets:
-${vetList}
-
-💰 Estimated Cost: ${cost}
-🍗 Food Advice: ${food}
-
-⚠️ When to see a vet:
-(short condition)
+You are a pet health assistant. Keep answers short and helpful.
 `,
           },
           { role: "user", content: userMessage },
@@ -139,44 +106,46 @@ ${vetList}
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: \`Bearer \${process.env.OPENAI_API_KEY}\`,
           "Content-Type": "application/json",
         },
       }
     );
 
-    const reply = response.data.choices[0].message.content;
+    const aiReply = response.data.choices[0].message.content;
 
-    // ✅ Twilio response format
+    // ✅ FIX 2: Clean XML-safe response
+    const safeReply = aiReply.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
     res.set("Content-Type", "text/xml");
     res.send(`
 <Response>
-<Message>${reply}</Message>
+<Message>${safeReply}</Message>
 </Response>
     `);
 
   } catch (error) {
-    console.error(error.message);
+    console.error("WhatsApp Error:", error.message);
 
     res.set("Content-Type", "text/xml");
     res.send(`
 <Response>
-<Message>Something went wrong. Please try again.</Message>
+<Message>⚠️ Error. Please try again.</Message>
 </Response>
     `);
   }
 });
 
 
-// ================= ROOT ROUTE (optional) =================
+// ================= ROOT =================
 app.get("/", (req, res) => {
   res.send("PetAssist API is running 🚀");
 });
 
 
-// ✅ IMPORTANT FOR RAILWAY
+// ================= SERVER =================
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(\`Server running on port \${PORT}\`);
 });
