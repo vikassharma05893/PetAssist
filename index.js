@@ -77,7 +77,16 @@ Keep it short.
 // ================= WHATSAPP ROUTE (FIXED) =================
 app.post("/whatsapp", async (req, res) => {
   try {
-    const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
+    let userMessage = "Hi";
+
+// 🔥 Handle BOTH formats (VERY IMPORTANT)
+if (typeof req.body === "string") {
+  // Twilio sends form data as string sometimes
+  const params = new URLSearchParams(req.body);
+  userMessage = params.get("Body") || "Hi";
+} else if (req.body && req.body.Body) {
+  userMessage = req.body.Body;
+}
 
     const text = userMessage.toLowerCase().trim();
 
