@@ -92,27 +92,27 @@ app.post("/whatsapp", async (req, res) => {
     }
 
     // 🔥 CLEAN FINAL MESSAGE
-    userMessage = userMessage.trim();
+userMessage = userMessage.trim();
 
-    console.log("🔥 FINAL MESSAGE:", userMessage);
+console.log("🔥 FINAL MESSAGE:", userMessage);
 
-    const text = userMessage.toLowerCase().trim();
-
-console.log("🔥 Incoming:", userMessage);
-
-// ================= WELCOME =================
+// ✅ ONLY ONE text declaration
 const text = userMessage.toLowerCase().trim();
 
 console.log("🔥 Incoming:", userMessage);
 
-// 🔥 STRONG GREETING DETECTION
-const isGreeting =
-  text.startsWith("hi") ||
-  text.startsWith("hello") ||
-  text.startsWith("hey");
+// ================= WELCOME =================
 
-// BUT ❗ only trigger if message is SHORT
-if (isGreeting && text.length <= 5) {
+// 🔥 CLEAN GREETING DETECTION (STRICT)
+const greetings = ["hi", "hello", "hey"];
+
+// normalize text
+const normalized = text.replace(/\s+/g, " ").trim();
+
+// check exact match only
+const isGreeting = greetings.includes(normalized);
+
+if (isGreeting) {
   const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
