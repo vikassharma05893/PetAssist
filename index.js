@@ -80,17 +80,17 @@ app.post("/whatsapp", async (req, res) => {
     const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
 
     const text = userMessage.toLowerCase().trim();
-    const cleanText = text.replace(/[^a-z\s]/g, "").trim();
 
-    console.log("🔥 Incoming:", userMessage);
+console.log("🔥 Incoming:", userMessage);
 
-    // ================= WELCOME =================
-    if (
-      cleanText === "hi" ||
-      cleanText === "hello" ||
-      cleanText === "hey"
-    ) {
-      const welcome = `
+// ================= WELCOME =================
+const isGreeting =
+  text === "hi" ||
+  text === "hello" ||
+  text === "hey";
+
+if (isGreeting) {
+  const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
@@ -101,9 +101,9 @@ Examples:
 • My dog has fever
 `;
 
-      res.set("Content-Type", "text/xml");
-      return res.send(`<Response><Message>${welcome}</Message></Response>`);
-    }
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${welcome}</Message></Response>`);
+}
 
     // ================= NORMAL FLOW =================
     logQuery(userMessage);
