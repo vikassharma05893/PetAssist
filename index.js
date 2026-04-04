@@ -105,25 +105,29 @@ Tell me what's wrong with your pet and I’ll help you instantly.
           {
             role: "system",
             content: `
-You are a smart pet health assistant.
+You are a pet health assistant.
+
+Give SHORT WhatsApp-friendly responses.
+
+STRICT RULES:
+- Max 6 lines
+- Each line < 20 words
+- No long paragraphs
 
 🧠 Issue:
 🚨 Severity:
 
 📋 What to do:
-- Real steps
+- Step 1
+- Step 2
+- Step 3
 
-🏥 Recommended Vet: ${vet}
+🏥 Vet: ${vet}
+💰 Cost: ${cost}
+🍗 Food: ${food}
 
-🏥 Nearby Vets:
-${vetList}
-
-💰 Estimated Cost: ${cost}
-
-🍗 Food Advice: ${food}
-
-⚠️ When to see a vet:
-Short warning
+⚠️ Warning:
+1 short line only
 `,
           },
           { role: "user", content: userMessage },
@@ -138,6 +142,11 @@ Short warning
     );
 
     let reply = response.data.choices[0].message.content;
+
+// 🔥 LIMIT TO 1200 CHAR (SAFE)
+if (reply.length > 1200) {
+  reply = reply.substring(0, 1200) + "\n\n...more details available";
+}
 
     // ================= XML SAFE =================
     reply = reply
