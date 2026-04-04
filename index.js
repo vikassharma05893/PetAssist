@@ -78,22 +78,19 @@ Keep it short.
 app.post("/whatsapp", async (req, res) => {
   try {
     const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
-    const text = userMessage.toLowerCase().trim();
 
-// clean text (removes emojis, punctuation)
-const cleanText = text.replace(/[^a-z\s]/g, "").trim();
+    const text = userMessage.toLowerCase().trim();
+    const cleanText = text.replace(/[^a-z\s]/g, "").trim();
 
     console.log("🔥 Incoming:", userMessage);
 
-    logQuery(userMessage);
-
     // ================= WELCOME =================
-if (
-  cleanText === "hi" ||
-  cleanText === "hello" ||
-  cleanText === "hey"
-) {
-  const welcome = `
+    if (
+      cleanText === "hi" ||
+      cleanText === "hello" ||
+      cleanText === "hey"
+    ) {
+      const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
@@ -104,32 +101,13 @@ Examples:
 • My dog has fever
 `;
 
-  res.set("Content-Type", "text/xml");
-  return res.send(`<Response><Message>${welcome}</Message></Response>`);
-}
-
       res.set("Content-Type", "text/xml");
       return res.send(`<Response><Message>${welcome}</Message></Response>`);
     }
 
-    // ================= EMERGENCY =================
-    if (
-      text.includes("bleeding") ||
-      text.includes("unconscious") ||
-      text.includes("not breathing")
-    ) {
-      const urgent = `
-🚨 EMERGENCY 🚨
+    // ================= NORMAL FLOW =================
+    logQuery(userMessage);
 
-Please take your pet to the nearest vet IMMEDIATELY.
-Do not wait for online advice.
-`;
-
-      res.set("Content-Type", "text/xml");
-      return res.send(`<Response><Message>${urgent}</Message></Response>`);
-    }
-
-    // ================= SMART DATA =================
     const { cost, vet, food } = getRecommendations(userMessage);
     const location = extractLocation(userMessage);
 
@@ -148,7 +126,6 @@ Do not wait for online advice.
       console.log("Vet fetch failed:", e.message);
     }
 
-    // ================= AI CALL =================
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -159,20 +136,13 @@ Do not wait for online advice.
             content: `
 You are a pet health assistant.
 
-Analyze the user's message and give REAL advice.
+Give real advice. No placeholders.
 
-DO NOT give generic instructions.
-DO NOT say "Step 1, Step 2".
-
-Always respond like this:
-
-🧠 Issue: (actual condition)
-
-🚨 Severity: Low / Medium / High
+🧠 Issue:
+🚨 Severity:
 
 📋 What to do:
-- Give real actionable steps
-- Example: Keep hydrated, feed bland diet
+- Real steps only
 
 🏥 Recommended Vet: ${vet}
 
@@ -184,9 +154,7 @@ ${vetList}
 🍗 Food Advice: ${food}
 
 ⚠️ When to see a vet:
-Give a real condition like "if symptoms continue >24 hrs"
-
-Keep it short and practical.
+Keep it short.
 `,
           },
           { role: "user", content: userMessage },
@@ -202,7 +170,6 @@ Keep it short and practical.
 
     let reply = response.data.choices[0].message.content;
 
-    // ================= XML SAFE =================
     reply = reply
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
