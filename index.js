@@ -150,7 +150,7 @@ Short warning
       `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
       new URLSearchParams({
         From: "whatsapp:+14155238886",
-        To: fromNumber,
+        To: `whatsapp:${fromNumber}`,
         Body: reply,
       }),
       {
