@@ -6,8 +6,13 @@ function extractLocation(message) {
 
   for (let key of keywords) {
     if (text.includes(key)) {
-      const location = message.split(key)[1];
-      return location.trim();
+      let location = message.split(key)[1];
+
+      // remove unwanted characters
+      location = location.replace(/[?.,!]/g, "").trim();
+
+      // take first 2–3 words max (for cases like "HSR Bangalore India")
+      return location.split(" ").slice(0, 3).join(" ");
     }
   }
 
@@ -36,6 +41,18 @@ function getRecommendations(message) {
       cost: "₹2000–₹8000",
       vet: "Emergency / Critical Care",
       food: "Do not feed — immediate vet attention"
+    };
+  }
+
+  // 🟠 TICKS / SKIN
+  if (
+    text.includes("ticks") ||
+    (text.includes("itching") && text.includes("skin"))
+  ) {
+    return {
+      cost: "₹800–₹3000",
+      vet: "Dermatology Vet",
+      food: "Anti-tick treatment + clean diet"
     };
   }
 
@@ -89,7 +106,7 @@ function getRecommendations(message) {
     };
   }
 
-  // 🟢 SKIN
+  // 🟢 SKIN GENERAL
   if (
     text.includes("itching") ||
     text.includes("rash") ||
