@@ -16,6 +16,8 @@ app.use(express.json());
 
 // ================= WHATSAPP ROUTE =================
 app.post("/whatsapp", async (req, res) => {
+  console.log("🔥 NEW CODE ACTIVE"); // 👈 ADD THIS
+
   try {
     let userMessage = "Hi";
 
