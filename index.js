@@ -19,6 +19,7 @@ app.post("/whatsapp", async (req, res) => {
   try {
     let userMessage = "Hi";
 
+    // 🔥 Extract message
     if (typeof req.body === "string") {
       const match = req.body.match(/Body=([^&]*)/);
       if (match) {
@@ -34,58 +35,57 @@ app.post("/whatsapp", async (req, res) => {
     console.log("📩 Message:", userMessage);
 
     // ================= GREETING =================
-    const greetings = ["hi", "hello", "hey"];
+const isGreeting =
+  text.startsWith("hi") ||
+  text.startsWith("hello") ||
+  text.startsWith("hey");
 
-    if (greetings.includes(text)) {
-      const welcome = `
+// ✅ Only trigger for short greetings
+if (isGreeting && text.length <= 20) {
+  const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
 `;
 
-      res.set("Content-Type", "text/xml");
-      return res.send(`<Response><Message>${welcome}</Message></Response>`);
-    }
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${welcome}</Message></Response>`);
+}
 
-    // ✅ INSTANT RESPONSE (CRITICAL)
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>🐾 Got it! Let me check...</Message></Response>`);
+    // ================= LOGIC =================
+    const { cost, vet, food } = getRecommendations(userMessage);
+    const location = extractLocation(userMessage);
 
-    // ================= BACKGROUND AI =================
-    setTimeout(async () => {
-      try {
-        const { cost, vet, food } = getRecommendations(userMessage);
-        const location = extractLocation(userMessage);
+    let vetList = "No nearby vets found";
 
-        let vetList = "No nearby vets found";
+    try {
+      const vets = await getNearbyVets(location);
+      if (vets.length > 0) {
+        vetList = vets
+          .slice(0, 3)
+          .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
+          .join("\n\n");
+      }
+    } catch {}
 
-        try {
-          const vets = await getNearbyVets(location);
-          if (vets.length > 0) {
-            vetList = vets
-              .slice(0, 3)
-              .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
-              .join("\n\n");
-          }
-        } catch {}
-
-        const response = await axios.post(
-          "https://api.openai.com/v1/chat/completions",
+    // ================= AI =================
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
           {
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: `
+            role: "system",
+            content: `
 You are a smart pet health assistant.
 
-Give specific advice.
+Give specific advice based on user message.
 
 🧠 Issue:
 🚨 Severity:
 
 📋 What to do:
-- Real steps
+- Real actionable steps
 
 🏥 Recommended Vet: ${vet}
 
@@ -95,31 +95,38 @@ ${vetList}
 💰 Estimated Cost: ${cost}
 
 🍗 Food Advice: ${food}
+
+⚠️ When to see a vet:
+Short warning
 `,
-              },
-              { role: "user", content: userMessage },
-            ],
           },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        console.log("✅ AI:", response.data.choices[0].message.content);
-
-      } catch (e) {
-        console.log("AI Error:", e.message);
+          { role: "user", content: userMessage },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
       }
-    }, 0);
+    );
 
-  } catch (error) {
-    console.error("Error:", error.message);
+    let reply = response.data.choices[0].message.content;
+
+    // ✅ Make safe for XML
+    reply = reply
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
 
     res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>Error</Message></Response>`);
+    res.send(`<Response><Message>${reply}</Message></Response>`);
+
+  } catch (error) {
+    console.error(error.message);
+
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>⚠️ Error. Try again.</Message></Response>`);
   }
 });
 
