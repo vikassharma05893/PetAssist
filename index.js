@@ -150,7 +150,9 @@ Short warning
       `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
       new URLSearchParams({
         From: "whatsapp:+14155238886",
-        To: `whatsapp:${fromNumber}`,
+        To: fromNumber.startsWith("whatsapp:")
+  ? fromNumber
+  : `whatsapp:${fromNumber}`,
         Body: reply,
       }),
       {
@@ -164,7 +166,7 @@ Short warning
     console.log("✅ Reply sent successfully");
 
   } catch (err) {
-    console.log("❌ Background error:", err.message);
+    console.log("❌ Background error:", err.response?.data || err.message);
   }
 }, 0);
 
