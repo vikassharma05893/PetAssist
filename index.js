@@ -19,7 +19,6 @@ app.post("/whatsapp", async (req, res) => {
   try {
     let userMessage = "Hi";
 
-    // 🔥 Robust Twilio parsing
     if (typeof req.body === "string") {
       const match = req.body.match(/Body=([^&]*)/);
       if (match) {
@@ -42,60 +41,51 @@ app.post("/whatsapp", async (req, res) => {
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
-
-Examples:
-• My dog is vomiting
-• My cat is not eating
-• My dog has fever
 `;
 
       res.set("Content-Type", "text/xml");
       return res.send(`<Response><Message>${welcome}</Message></Response>`);
     }
 
-    // ================= LOGIC =================
-    logQuery(userMessage);
+    // ✅ INSTANT RESPONSE (CRITICAL)
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>🐾 Got it! Let me check...</Message></Response>`);
 
-    const { cost, vet, food } = getRecommendations(userMessage);
-    const location = extractLocation(userMessage);
+    // ================= BACKGROUND AI =================
+    setTimeout(async () => {
+      try {
+        const { cost, vet, food } = getRecommendations(userMessage);
+        const location = extractLocation(userMessage);
 
-    let vetList = "No nearby vets found";
+        let vetList = "No nearby vets found";
 
-    try {
-      const vets = await getNearbyVets(location);
+        try {
+          const vets = await getNearbyVets(location);
+          if (vets.length > 0) {
+            vetList = vets
+              .slice(0, 3)
+              .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
+              .join("\n\n");
+          }
+        } catch {}
 
-      if (vets.length > 0) {
-        vetList = vets
-          .slice(0, 3)
-          .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
-          .join("\n\n");
-      }
-    } catch (e) {
-      console.log("Vet fetch failed");
-    }
-
-    // ================= AI =================
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
           {
-            role: "system",
-            content: `
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `
 You are a smart pet health assistant.
 
-Understand the user's message and give specific advice.
-
-DO NOT give generic answers.
-
-Format:
+Give specific advice.
 
 🧠 Issue:
 🚨 Severity:
 
 📋 What to do:
-- Clear, real actions
+- Real steps
 
 🏥 Recommended Vet: ${vet}
 
@@ -105,41 +95,31 @@ ${vetList}
 💰 Estimated Cost: ${cost}
 
 🍗 Food Advice: ${food}
-
-⚠️ When to see a vet:
-Short warning
 `,
+              },
+              { role: "user", content: userMessage },
+            ],
           },
           {
-            role: "user",
-            content: userMessage,
-          },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+            headers: {
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        console.log("✅ AI:", response.data.choices[0].message.content);
+
+      } catch (e) {
+        console.log("AI Error:", e.message);
       }
-    );
-
-    let reply = response.data.choices[0].message.content;
-
-    // ✅ XML safe
-    reply = reply
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>${reply}</Message></Response>`);
+    }, 0);
 
   } catch (error) {
     console.error("Error:", error.message);
 
     res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>⚠️ Error. Try again.</Message></Response>`);
+    res.send(`<Response><Message>Error</Message></Response>`);
   }
 });
 
