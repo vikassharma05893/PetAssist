@@ -10,7 +10,7 @@ const getNearbyVets = require("./vets");
 const app = express();
 
 // ✅ Needed for Twilio
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 
@@ -76,19 +76,17 @@ Keep it short.
 // ================= WHATSAPP ROUTE (FIXED) =================
 app.post("/whatsapp", (req, res) => {
   try {
-    const userMessage = req.body.Body || "Hi";
+    const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
 
-    console.log("Incoming WhatsApp:", userMessage);
+    console.log("FULL BODY:", req.body);
+
+    logQuery(userMessage);
 
     // ✅ INSTANT RESPONSE (no waiting)
     const reply = "🐾 Got your message! Checking your pet's condition...";
 
     res.set("Content-Type", "text/xml");
-    res.send(`
-<Response>
-<Message>${reply}</Message>
-</Response>
-    `);
+res.send(`<Response><Message>${reply}</Message></Response>`);
 
     // ✅ Run AI in background (does not block Twilio)
     setTimeout(async () => {
