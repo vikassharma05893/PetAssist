@@ -78,12 +78,47 @@ Keep it short.
 app.post("/whatsapp", async (req, res) => {
   try {
     const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
+    const text = userMessage.toLowerCase();
 
     console.log("🔥 Incoming:", userMessage);
 
     logQuery(userMessage);
 
-    // 👉 Get smart data
+    // ================= WELCOME =================
+    if (["hi", "hello", "hey"].includes(text)) {
+      const welcome = `
+🐾 Hi! I'm PetAssist 🐶🐱
+
+Tell me what's wrong with your pet and I’ll help you instantly.
+
+Examples:
+• My dog is vomiting
+• My cat is not eating
+• My dog has fever
+`;
+
+      res.set("Content-Type", "text/xml");
+      return res.send(`<Response><Message>${welcome}</Message></Response>`);
+    }
+
+    // ================= EMERGENCY =================
+    if (
+      text.includes("bleeding") ||
+      text.includes("unconscious") ||
+      text.includes("not breathing")
+    ) {
+      const urgent = `
+🚨 EMERGENCY 🚨
+
+Please take your pet to the nearest vet IMMEDIATELY.
+Do not wait for online advice.
+`;
+
+      res.set("Content-Type", "text/xml");
+      return res.send(`<Response><Message>${urgent}</Message></Response>`);
+    }
+
+    // ================= SMART DATA =================
     const { cost, vet, food } = getRecommendations(userMessage);
     const location = extractLocation(userMessage);
 
@@ -102,7 +137,7 @@ app.post("/whatsapp", async (req, res) => {
       console.log("Vet fetch failed:", e.message);
     }
 
-    // 👉 Call AI
+    // ================= AI CALL =================
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -113,15 +148,20 @@ app.post("/whatsapp", async (req, res) => {
             content: `
 You are a pet health assistant.
 
-Always respond in this format:
+Analyze the user's message and give REAL advice.
 
-🧠 Issue:
-🚨 Severity:
+DO NOT give generic instructions.
+DO NOT say "Step 1, Step 2".
+
+Always respond like this:
+
+🧠 Issue: (actual condition)
+
+🚨 Severity: Low / Medium / High
 
 📋 What to do:
-- Step 1
-- Step 2
-- Step 3
+- Give real actionable steps
+- Example: Keep hydrated, feed bland diet
 
 🏥 Recommended Vet: ${vet}
 
@@ -129,10 +169,13 @@ Always respond in this format:
 ${vetList}
 
 💰 Estimated Cost: ${cost}
+
 🍗 Food Advice: ${food}
 
 ⚠️ When to see a vet:
-Keep it short.
+Give a real condition like "if symptoms continue >24 hrs"
+
+Keep it short and practical.
 `,
           },
           { role: "user", content: userMessage },
@@ -148,7 +191,7 @@ Keep it short.
 
     let reply = response.data.choices[0].message.content;
 
-    // ✅ Make XML safe
+    // ================= XML SAFE =================
     reply = reply
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -164,7 +207,6 @@ Keep it short.
     res.send(`<Response><Message>⚠️ Something went wrong</Message></Response>`);
   }
 });
-
 // ================= ROOT =================
 app.get("/", (req, res) => {
   res.send("PetAssist API is running 🚀");
