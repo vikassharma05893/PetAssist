@@ -78,54 +78,11 @@ Keep it short.
 
 // ================= WHATSAPP ROUTE (FIXED) =================
 app.post("/whatsapp", (req, res) => {
-  try {
-    const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
+  console.log("🔥 WEBHOOK HIT");
 
-    console.log("FULL BODY:", req.body);
-
-    logQuery(userMessage);
-
-    // ✅ INSTANT RESPONSE (no waiting)
-    const reply = "🐾 Got your message! Checking your pet's condition...";
-
-    res.set("Content-Type", "text/xml");
-res.send(`<Response><Message>${reply}</Message></Response>`);
-
-    // ✅ Run AI in background (does not block Twilio)
-    setTimeout(async () => {
-      try {
-        const response = await axios.post(
-          "https://api.openai.com/v1/chat/completions",
-          {
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: "You are a pet health assistant." },
-              { role: "user", content: userMessage },
-            ],
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        console.log("AI Response:", response.data.choices[0].message.content);
-
-      } catch (e) {
-        console.log("Background AI error:", e.message);
-      }
-    }, 0);
-
-  } catch (error) {
-    console.error("FINAL ERROR:", error);
-
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>Server error</Message></Response>`);
-  }
+  res.set("Content-Type", "text/xml");
+  res.send("<Response><Message>Working ✅</Message></Response>");
 });
-
 
 // ================= ROOT =================
 app.get("/", (req, res) => {
