@@ -10,11 +10,9 @@ const getNearbyVets = require("./vets");
 const app = express();
 
 // ✅ Needed for Twilio
+app.use(express.text({ type: "*/*" }));   // 🔥 MUST BE FIRST
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-// 🔥 ADD THIS LINE (IMPORTANT)
-app.use(express.text());
 
 
 // ================= TEST ROUTE =================
