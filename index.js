@@ -35,12 +35,9 @@ app.post("/whatsapp", async (req, res) => {
     console.log("📩 Message:", userMessage);
 logQuery(userMessage);
     // ================= GREETING =================
-    const isGreeting =
-      text.startsWith("hi") ||
-      text.startsWith("hello") ||
-      text.startsWith("hey");
+    const greetings = ["hi", "hello", "hey"];
 
-    if (isGreeting && text.split(" ").length <= 3) {
+if (greetings.includes(text)) {
   const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
