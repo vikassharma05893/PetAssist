@@ -17,9 +17,7 @@ async function getNearbyVets(location) {
       name: place.name,
       rating: place.rating || "N/A",
       address: place.formatted_address,
-      link: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-        place.name + " " + place.formatted_address
-      )}`,
+      link: `https://www.google.com/maps/place/?q=place_id:${place.place_id}`,
     }));
 
   } catch (error) {
