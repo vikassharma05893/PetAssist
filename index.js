@@ -143,10 +143,18 @@ STRICT RULES:
 
     let reply = response.data.choices[0].message.content;
 
-// 🔥 LIMIT TO 1200 CHAR (SAFE)
-if (reply.length > 1200) {
-  reply = reply.substring(0, 1200) + "\n\n...more details available";
+// 🔥 LIMIT AI PART ONLY
+if (reply.length > 800) {
+  reply = reply.substring(0, 800) + "...";
 }
+
+// 🔥 APPEND VETS BACK
+reply = `
+${reply}
+
+🏥 Nearby Vets:
+${vetList}
+`;
 
     // ================= XML SAFE =================
     reply = reply
