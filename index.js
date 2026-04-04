@@ -78,15 +78,22 @@ Keep it short.
 app.post("/whatsapp", async (req, res) => {
   try {
     const userMessage = (req.body && req.body.Body) ? req.body.Body : "Hi";
-    const text = userMessage.toLowerCase();
+    const text = userMessage.toLowerCase().trim();
+
+// clean text (removes emojis, punctuation)
+const cleanText = text.replace(/[^a-z\s]/g, "").trim();
 
     console.log("🔥 Incoming:", userMessage);
 
     logQuery(userMessage);
 
     // ================= WELCOME =================
-    if (["hi", "hello", "hey"].includes(text)) {
-      const welcome = `
+if (
+  cleanText === "hi" ||
+  cleanText === "hello" ||
+  cleanText === "hey"
+) {
+  const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
@@ -96,6 +103,10 @@ Examples:
 • My cat is not eating
 • My dog has fever
 `;
+
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${welcome}</Message></Response>`);
+}
 
       res.set("Content-Type", "text/xml");
       return res.send(`<Response><Message>${welcome}</Message></Response>`);
