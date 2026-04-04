@@ -16,8 +16,6 @@ app.use(express.json());
 
 // ================= WHATSAPP ROUTE =================
 app.post("/whatsapp", async (req, res) => {
-  console.log("🔥 NEW CODE ACTIVE"); // 👈 ADD THIS
-
   try {
     let userMessage = "Hi";
 
@@ -37,57 +35,59 @@ app.post("/whatsapp", async (req, res) => {
     console.log("📩 Message:", userMessage);
 
     // ================= GREETING =================
-const isGreeting =
-  text.startsWith("hi") ||
-  text.startsWith("hello") ||
-  text.startsWith("hey");
+    const isGreeting =
+      text.startsWith("hi") ||
+      text.startsWith("hello") ||
+      text.startsWith("hey");
 
-// ✅ Only trigger for short greetings
-if (isGreeting && text.length <= 20) {
-  const welcome = `
+    if (isGreeting && text.length <= 20) {
+      const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
 `;
 
-  res.set("Content-Type", "text/xml");
-  return res.send(`<Response><Message>${welcome}</Message></Response>`);
-}
+      res.set("Content-Type", "text/xml");
+      return res.send(`<Response><Message>${welcome}</Message></Response>`);
+    }
 
-    // ================= LOGIC =================
-    const { cost, vet, food } = getRecommendations(userMessage);
-    const location = extractLocation(userMessage);
+    // ================= FAST ACK =================
+    res.set("Content-Type", "text/xml");
+    res.send(`<Response><Message>🐾 Got your message. Working on it...</Message></Response>`);
 
-    let vetList = "No nearby vets found";
+    // ================= BACKGROUND PROCESS =================
+    setTimeout(async () => {
+      try {
+        const { cost, vet, food } = getRecommendations(userMessage);
+        const location = extractLocation(userMessage);
 
-    try {
-      const vets = await getNearbyVets(location);
-      if (vets.length > 0) {
-        vetList = vets
-          .slice(0, 3)
-          .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
-          .join("\n\n");
-      }
-    } catch {}
+        let vetList = "No nearby vets found";
 
-    // ================= AI =================
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4o-mini",
-        messages: [
+        try {
+          const vets = await getNearbyVets(location);
+          if (vets.length > 0) {
+            vetList = vets
+              .slice(0, 3)
+              .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
+              .join("\n\n");
+          }
+        } catch {}
+
+        const response = await axios.post(
+          "https://api.openai.com/v1/chat/completions",
           {
-            role: "system",
-            content: `
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: `
 You are a smart pet health assistant.
-
-Give specific advice based on user message.
 
 🧠 Issue:
 🚨 Severity:
 
 📋 What to do:
-- Real actionable steps
+- Real steps
 
 🏥 Recommended Vet: ${vet}
 
@@ -101,34 +101,52 @@ ${vetList}
 ⚠️ When to see a vet:
 Short warning
 `,
+              },
+              { role: "user", content: userMessage },
+            ],
           },
-          { role: "user", content: userMessage },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        let reply = response.data.choices[0].message.content;
+
+        // XML safe
+        reply = reply
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        // 🔥 SEND VIA TWILIO API
+        await axios.post(
+          `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
+          new URLSearchParams({
+            From: "whatsapp:+14155238886",
+            To: req.body.From,
+            Body: reply,
+          }),
+          {
+            auth: {
+              username: process.env.TWILIO_SID,
+              password: process.env.TWILIO_AUTH_TOKEN,
+            },
+          }
+        );
+
+      } catch (err) {
+        console.log("Background error:", err.message);
       }
-    );
-
-    let reply = response.data.choices[0].message.content;
-
-    // ✅ Make safe for XML
-    reply = reply
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-
-    res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>${reply}</Message></Response>`);
+    }, 0);
 
   } catch (error) {
     console.error(error.message);
 
     res.set("Content-Type", "text/xml");
-    res.send(`<Response><Message>⚠️ Error. Try again.</Message></Response>`);
+    res.send(`<Response><Message>⚠️ Error</Message></Response>`);
   }
 });
 
