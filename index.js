@@ -13,6 +13,9 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// 🔥 ADD THIS LINE (IMPORTANT)
+app.use(express.text());
+
 
 // ================= TEST ROUTE =================
 app.post("/test", async (req, res) => {
@@ -119,11 +122,7 @@ res.send(`<Response><Message>${reply}</Message></Response>`);
     console.error("FINAL ERROR:", error);
 
     res.set("Content-Type", "text/xml");
-    res.send(`
-<Response>
-<Message>Server error</Message>
-</Response>
-    `);
+    res.send(`<Response><Message>Server error</Message></Response>`);
   }
 });
 
