@@ -33,23 +33,23 @@ app.post("/whatsapp", async (req, res) => {
     const text = userMessage.toLowerCase();
 
     console.log("📩 Message:", userMessage);
-
+logQuery(userMessage);
     // ================= GREETING =================
     const isGreeting =
       text.startsWith("hi") ||
       text.startsWith("hello") ||
       text.startsWith("hey");
 
-    if (isGreeting && text.length <= 20) {
-      const welcome = `
+    if (isGreeting && text.split(" ").length <= 3) {
+  const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
 `;
 
-      res.set("Content-Type", "text/xml");
-      return res.send(`<Response><Message>${welcome}</Message></Response>`);
-    }
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${welcome}</Message></Response>`);
+}
 
     // ================= FAST ACK =================
     res.set("Content-Type", "text/xml");
@@ -57,30 +57,54 @@ Tell me what's wrong with your pet and I’ll help you instantly.
 
     // ================= BACKGROUND PROCESS =================
     setTimeout(async () => {
-      try {
-        const { cost, vet, food } = getRecommendations(userMessage);
-        const location = extractLocation(userMessage);
+  try {
+    // ================= EXTRACT FROM NUMBER =================
+    let fromNumber = "";
 
-        let vetList = "No nearby vets found";
+    if (typeof req.body === "string") {
+      const match = req.body.match(/From=([^&]*)/);
+      if (match) {
+        fromNumber = decodeURIComponent(match[1]);
+      }
+    } else if (req.body && req.body.From) {
+      fromNumber = req.body.From;
+    }
 
-        try {
-          const vets = await getNearbyVets(location);
-          if (vets.length > 0) {
-            vetList = vets
-              .slice(0, 3)
-              .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
-              .join("\n\n");
-          }
-        } catch {}
+    console.log("📤 Sending to:", fromNumber);
 
-        const response = await axios.post(
-          "https://api.openai.com/v1/chat/completions",
+    // ❌ Safety check
+    if (!fromNumber) {
+      console.log("❌ No valid From number");
+      return;
+    }
+
+    // ================= LOGIC =================
+    const { cost, vet, food } = getRecommendations(userMessage);
+    const location = extractLocation(userMessage);
+
+    let vetList = "No nearby vets found";
+
+    try {
+      const vets = await getNearbyVets(location);
+      if (vets.length > 0) {
+        vetList = vets
+          .slice(0, 3)
+          .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
+          .join("\n\n");
+      }
+    } catch (e) {
+      console.log("Vet error:", e.message);
+    }
+
+    // ================= AI =================
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        messages: [
           {
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content: `
+            role: "system",
+            content: `
 You are a smart pet health assistant.
 
 🧠 Issue:
@@ -101,53 +125,57 @@ ${vetList}
 ⚠️ When to see a vet:
 Short warning
 `,
-              },
-              { role: "user", content: userMessage },
-            ],
           },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        let reply = response.data.choices[0].message.content;
-
-        // XML safe
-        reply = reply
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-
-        // 🔥 SEND VIA TWILIO API
-        await axios.post(
-          `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
-          new URLSearchParams({
-            From: "whatsapp:+14155238886",
-            To: req.body.From,
-            Body: reply,
-          }),
-          {
-            auth: {
-              username: process.env.TWILIO_SID,
-              password: process.env.TWILIO_AUTH_TOKEN,
-            },
-          }
-        );
-
-      } catch (err) {
-        console.log("Background error:", err.message);
+          { role: "user", content: userMessage },
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
       }
-    }, 0);
+    );
+
+    let reply = response.data.choices[0].message.content;
+
+    // ================= XML SAFE =================
+    reply = reply
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // ================= SEND VIA TWILIO =================
+    await axios.post(
+      `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
+      new URLSearchParams({
+        From: "whatsapp:+14155238886",
+        To: fromNumber,
+        Body: reply,
+      }),
+      {
+        auth: {
+          username: process.env.TWILIO_SID,
+          password: process.env.TWILIO_AUTH_TOKEN,
+        },
+      }
+    );
+
+    console.log("✅ Reply sent successfully");
+
+  } catch (err) {
+    console.log("❌ Background error:", err.message);
+  }
+}, 0);
 
   } catch (error) {
-    console.error(error.message);
+  console.error(error.message);
 
+  if (!res.headersSent) {
     res.set("Content-Type", "text/xml");
     res.send(`<Response><Message>⚠️ Error</Message></Response>`);
   }
+}
 });
 
 
