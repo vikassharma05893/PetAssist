@@ -77,28 +77,42 @@ Keep it short.
 // ================= WHATSAPP ROUTE (FIXED) =================
 app.post("/whatsapp", async (req, res) => {
   try {
+    // 🔥 DEBUG LOGS (ADD THIS)
+    console.log("BODY TYPE:", typeof req.body);
+    console.log("FULL BODY:", req.body);
+
     let userMessage = "Hi";
 
-// 🔥 Handle BOTH formats (VERY IMPORTANT)
-if (typeof req.body === "string") {
-  // Twilio sends form data as string sometimes
-  const params = new URLSearchParams(req.body);
-  userMessage = params.get("Body") || "Hi";
-} else if (req.body && req.body.Body) {
-  userMessage = req.body.Body;
-}
+    // 🔥 Handle BOTH formats (IMPORTANT)
+    if (typeof req.body === "string") {
+      const params = new URLSearchParams(req.body);
+      userMessage = params.get("Body") || "Hi";
+    } else if (req.body && req.body.Body) {
+      userMessage = req.body.Body;
+    }
+
+    // 🔥 CLEAN FINAL MESSAGE
+    userMessage = userMessage.trim();
+
+    console.log("🔥 FINAL MESSAGE:", userMessage);
 
     const text = userMessage.toLowerCase().trim();
 
 console.log("🔥 Incoming:", userMessage);
 
 // ================= WELCOME =================
-const isGreeting =
-  text === "hi" ||
-  text === "hello" ||
-  text === "hey";
+const text = userMessage.toLowerCase().trim();
 
-if (isGreeting) {
+console.log("🔥 Incoming:", userMessage);
+
+// 🔥 STRONG GREETING DETECTION
+const isGreeting =
+  text.startsWith("hi") ||
+  text.startsWith("hello") ||
+  text.startsWith("hey");
+
+// BUT ❗ only trigger if message is SHORT
+if (isGreeting && text.length <= 5) {
   const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
