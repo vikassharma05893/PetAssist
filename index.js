@@ -51,22 +51,45 @@ app.post("/whatsapp", async (req, res) => {
     }
 
     userMessage = userMessage.trim();
-    const text = userMessage.toLowerCase();
+const text = userMessage.toLowerCase();
+
+// ================= EYE CHECK FLOW =================
+if (["eye check", "eye", "check eye"].includes(text)) {
+  const eyeGuide = `
+👁️ *Advanced Eye Check*
+
+1️⃣ Share a picture of your pet’s eyes:
+Upload a clear close-up of both eyes in natural light (no flash)
+
+2️⃣ Capture properly:
+• Both eyes visible (front view)
+• No flash, good lighting
+• Sharp focus on pupil/iris
+• Include eyelids/discharge
+• Optional: one dim-light photo
+
+3️⃣ What we look for:
+• Dilated pupils → stress/pain  
+• Unequal pupils → neurological (urgent)  
+• Redness/swelling → infection/allergy  
+• Yellow/green discharge → bacterial infection  
+• Cloudiness → corneal issue/cataract  
+
+4️⃣ Quick triage:
+🟢 Mild redness → monitor  
+🟡 Discharge → vet soon  
+🔴 Unequal pupils/cloudy eye → urgent  
+
+📸 Send the eye image when ready.
+`;
+
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
+}
+
 let mediaUrl = null;
 
 if (typeof req.body === "string") {
-  const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
-  if (mediaMatch) {
-    mediaUrl = decodeURIComponent(mediaMatch[1]);
-  }
-} else if (req.body) {
-  mediaUrl = req.body.MediaUrl0 || null;
-}
-
-console.log("📸 Media URL:", mediaUrl);
-
-    console.log("📩 Message:", userMessage);
-logQuery(userMessage);
     // ================= GREETING =================
     const greetings = ["hi", "hello", "hey"];
 
@@ -130,35 +153,6 @@ Tell me what's wrong with your pet and I’ll help you instantly.
       console.log("Vet error:", e.message);
     }
 
-    // ================= EYE CHECK FLOW =================
-if (text.includes("eye check")) {
-  const eyeGuide = `
-👁️ *Advanced Eye Check*
-
-1️⃣ Share a picture of your pet’s eyes:
-Upload a clear close-up of both eyes in natural light (no flash)
-
-2️⃣ Capture properly:
-• Both eyes visible (front view)
-• No flash, good lighting
-• Sharp focus on pupil/iris
-• Include eyelids/discharge
-• Optional: one dim-light photo
-
-3️⃣ What we look for:
-• Dilated pupils → stress/pain  
-• Unequal pupils → neurological (urgent)  
-• Redness/swelling → infection/allergy  
-• Yellow/green discharge → bacterial infection  
-• Cloudiness → corneal issue/cataract  
-
-4️⃣ Quick triage:
-🟢 Mild redness → monitor  
-🟡 Discharge → vet soon  
-🔴 Unequal pupils/cloudy eye → urgent  
-
-📸 Send the eye image when ready.
-`;
 
   res.set("Content-Type", "text/xml");
   return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
@@ -287,11 +281,12 @@ if (!isImageValid) {
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
 }
 
-// IMAGE → suggest advanced check
-else {
-  reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet’s eyes.";
-}
+// 🔥 CTA LOGIC
+
+if (!isImageValid) {
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
+} else {
+  reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet’s eyes.";
 }
 
 // 🔥 DETECT GREETING
