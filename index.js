@@ -97,7 +97,7 @@ res.send(`<Response><Message>${reply}</Message></Response>`);
   .slice(0, 3)
   .map((v, i) =>
   `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
-📍 Tap to open: ${v.link}`
+📍 ${v.name} on Google Maps`
 )
   .join("\n\n");
       }
@@ -126,21 +126,25 @@ If the user sends an image:
 - Do NOT assume beyond what is visible
 - Give practical next steps.
 
+If an image is already provided:
+- Do NOT ask for another image
+- Give the best possible analysis directly
+
 If the user sends BOTH text + image:
 - Combine both inputs for better diagnosis.
 
 STRICT RULES:
-- Max 6 lines
-- Each line < 20 words
-- No long paragraphs
+- Max 6–8 lines
+- Keep it concise but natural
+- Avoid robotic formatting
 
 🧠 Issue:
 🚨 Severity:
 
 📋 What to do:
-- Step 1
-- Step 2
-- Step 3
+- Give 2–4 clear bullet points
+- Keep them short and practical
+- No numbering like Step 1/2/3
 
 🏥 Vet: ${vet}
 💰 Cost: ${cost}
@@ -153,11 +157,9 @@ STRICT RULES:
           {
   role: "user",
   content: mediaUrl
-    ? [
-        { type: "text", text: userMessage || "Analyze this pet condition" },
-        { type: "image_url", image_url: { url: mediaUrl } }
-      ]
+    ? `${userMessage || "Analyze this pet condition"}\n\n[Image attached: analyze possible symptoms carefully]`
     : userMessage,
+}
 },
         ],
       },
