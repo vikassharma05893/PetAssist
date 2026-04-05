@@ -155,9 +155,8 @@ ${vetList}
 
     // ================= XML SAFE =================
     reply = reply
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;");
 
     // ================= SEND VIA TWILIO =================
     await axios.post(

@@ -11,7 +11,9 @@ async function getNearbyVets(location) {
       },
     });
 
-    const results = response.data.results.slice(0, 3);
+    console.log("FULL GOOGLE RESPONSE:", JSON.stringify(response.data.results[0], null, 2));
+
+const results = response.data.results.slice(0, 3);
 
     return results.map(place => ({
       name: place.name,
