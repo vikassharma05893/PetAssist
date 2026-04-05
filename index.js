@@ -85,9 +85,13 @@ Tell me what's wrong with your pet and I’ll help you instantly.
       const vets = await getNearbyVets(location);
       if (vets.length > 0) {
         vetList = vets
-          .slice(0, 3)
-          .map(v => `• ${v.name} ⭐ ${v.rating}\n📍 ${v.link}`)
-          .join("\n\n");
+  .slice(0, 3)
+  .map((v, i) =>
+    `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
+📍 Tap to open:
+${v.link}`
+  )
+  .join("\n\n");
       }
     } catch (e) {
       console.log("Vet error:", e.message);
@@ -149,8 +153,10 @@ if (reply.length > 800) {
 reply = `
 ${reply}
 
-🏥 Nearby Vets:
+━━━━━━━━━━━━━━━
+🏥 *Nearby Vets* (tap to open):
 ${vetList}
+━━━━━━━━━━━━━━━
 `;
 
     // ================= XML SAFE =================
