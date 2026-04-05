@@ -87,10 +87,9 @@ Tell me what's wrong with your pet and I’ll help you instantly.
         vetList = vets
   .slice(0, 3)
   .map((v, i) =>
-    `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
-📍 Tap to open:
-${v.link}`
-  )
+  `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
+📍 https://maps.google.com/?q=${encodeURIComponent(v.name)}`
+)
   .join("\n\n");
       }
     } catch (e) {
