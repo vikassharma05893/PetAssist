@@ -251,8 +251,33 @@ if (!isImageValid) {
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
 }
 
-// 🔥 FINAL FORMAT (NO DUPLICATES, NO CRASH)
-if (!isImageValid) {
+// 🔥 DETECT GREETING
+const isGreeting =
+  text.startsWith("hi") ||
+  text.startsWith("hello") ||
+  text.startsWith("hey");
+
+// 🔥 DETECT IMAGE + TEXT
+const isImageWithText = isImageValid && userMessage && userMessage.trim().length > 0;
+
+// 🔥 FINAL FORMAT LOGIC
+
+// ✅ IMAGE + TEXT FIRST MESSAGE → Greeting + Vets
+if (isImageWithText && !isGreeting) {
+  reply = `🐾 Hi! I'm PetAssist 🐶🐱
+
+Here's what I found:
+
+${reply}
+
+━━━━━━━━━━━━━━━
+🏥 Nearby Vets:
+${vetList}
+━━━━━━━━━━━━━━━`;
+}
+
+// ✅ TEXT ONLY → Analysis + Vets (unchanged)
+else if (!isImageValid) {
   reply = `🐾 PetAssist Analysis
 
 ${reply}
@@ -261,7 +286,10 @@ ${reply}
 🏥 Nearby Vets:
 ${vetList}
 ━━━━━━━━━━━━━━━`;
-} else {
+}
+
+// ✅ IMAGE ONLY → Analysis only (unchanged)
+else {
   reply = `🐾 PetAssist Analysis
 
 ${reply}`;
