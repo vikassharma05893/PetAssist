@@ -96,8 +96,8 @@ res.send(`<Response><Message>${reply}</Message></Response>`);
         vetList = vets
   .slice(0, 3)
   .map((v, i) =>
-  `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
-📍 Tap to search → maps.google.com/?q=${encodeURIComponent(v.name)}
+  "🐾 *" + (i + 1) + ". " + v.name + "* (⭐ " + v.rating + ")\n" +
+  "📍 Tap to search → maps.google.com/?q=" + encodeURIComponent(v.name)
 )
   .join("\n\n");
       }
