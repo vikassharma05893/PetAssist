@@ -33,8 +33,13 @@ app.post("/whatsapp", async (req, res) => {
     const text = userMessage.toLowerCase();
 let mediaUrl = null;
 
-if (req.body.NumMedia && req.body.NumMedia !== "0") {
-  mediaUrl = req.body.MediaUrl0;
+if (typeof req.body === "string") {
+  const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
+  if (mediaMatch) {
+    mediaUrl = decodeURIComponent(mediaMatch[1]);
+  }
+} else if (req.body) {
+  mediaUrl = req.body.MediaUrl0 || null;
 }
 
 console.log("📸 Media URL:", mediaUrl);
@@ -44,17 +49,17 @@ logQuery(userMessage);
     // ================= GREETING =================
     const greetings = ["hi", "hello", "hey"];
 
-if (greetings.includes(text)) {
+if (greetings.some(g => text.startsWith(g))) {
   const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
 Tell me what's wrong with your pet and I’ll help you instantly.
+
+📸 Want a more accurate answer? Send a photo of your pet.
 `;
 
-  reply += "\n\n📸 Want a more accurate answer? Send a photo of your pet.";
-
-res.set("Content-Type", "text/xml");
-res.send(`<Response><Message>${reply}</Message></Response>`);
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${welcome}</Message></Response>`);
 }
 
     // ================= FAST ACK =================
