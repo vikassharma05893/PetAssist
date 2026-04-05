@@ -159,10 +159,7 @@ Tell me what's wrong with your pet and I’ll help you instantly.
   .join("\n\n");
       }
     } catch (e) {
-      console.log("Vet error:", e.message);
-    }
-
-
+  console.log("Vet error:", e.message);
 }
 
 // ================= AI =================
