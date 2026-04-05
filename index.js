@@ -97,7 +97,7 @@ res.send(`<Response><Message>${reply}</Message></Response>`);
   .slice(0, 3)
   .map((v, i) =>
   `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
-📍 ${v.name} on Google Maps`
+📍 Tap to search → maps.google.com/?q=${encodeURIComponent(v.name)}
 )
   .join("\n\n");
       }
@@ -158,10 +158,9 @@ STRICT RULES:
   role: "user",
   content: mediaUrl
     ? `${userMessage || "Analyze this pet condition"}\n\n[Image attached: analyze possible symptoms carefully]`
-    : userMessage,
+    : userMessage
 }
-},
-        ],
+],
       },
       {
         headers: {
@@ -171,7 +170,14 @@ STRICT RULES:
       }
     );
 
-    let reply = response.data.choices[0].message.content;
+    let aiReply = response.data.choices[0].message.content;
+
+// 🔥 LIMIT AI RESPONSE CLEANLY
+if (aiReply.length > 700) {
+  aiReply = aiReply.substring(0, 700) + "...";
+}
+
+let reply = aiReply;
 
 // 🔥 SMART CTA (only if no image was sent)
 if (!mediaUrl) {
@@ -181,20 +187,22 @@ if (!mediaUrl) {
 // 🔥 Force text before links to avoid preview
 reply = "🐾 PetAssist Analysis\n\n" + reply;
 
-// 🔥 LIMIT AI PART ONLY
-if (reply.length > 800) {
-  reply = reply.substring(0, 800) + "...";
+// 🔥 LIMIT ONLY AI TEXT BEFORE FORMATTING
+let aiReply = response.data.choices[0].message.content;
+
+if (aiReply.length > 700) {
+  aiReply = aiReply.substring(0, 700) + "...";
 }
 
 // 🔥 APPEND VETS BACK
-reply = `
+reply = `🐾 PetAssist Analysis
+
 ${reply}
 
 ━━━━━━━━━━━━━━━
-🏥 *Nearby Vets* (tap to open):
+🏥 Nearby Vets:
 ${vetList}
-━━━━━━━━━━━━━━━
-`;
+━━━━━━━━━━━━━━━`;
 
     // ================= XML SAFE =================
     reply = reply
