@@ -106,14 +106,14 @@ res.send(`<Response><Message>${reply}</Message></Response>`);
     }
 
     // ================= AI =================
-    const response = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
+const response = await axios.post(
+  "https://api.openai.com/v1/chat/completions",
+  {
+    model: "gpt-4o",
+    messages: [
       {
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-content: `
+        role: "system",
+        content: `
 You are a smart pet health assistant.
 
 Give SHORT, clear, WhatsApp-friendly responses.
@@ -153,48 +153,40 @@ STRICT RULES:
 ⚠️ Warning:
 1 short line only
 `,
-          },
-          {
-  role: "user",
-  content: mediaUrl
-    ? `${userMessage || "Analyze this pet condition"}\n\n[Image attached: analyze possible symptoms carefully]`
-    : userMessage
-}
-],
       },
       {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+        role: "user",
+        content: mediaUrl
+          ? `${userMessage || "Analyze this pet condition"}\n\n[Image attached: analyze possible symptoms carefully]`
+          : userMessage,
+      },
+    ],
+  },
+  {
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+  }
+);
 
-    let aiReply = response.data.choices[0].message.content;
-
-// 🔥 LIMIT AI RESPONSE CLEANLY
-if (aiReply.length > 700) {
-  aiReply = aiReply.substring(0, 700) + "...";
-}
-
-let reply = aiReply;
-
-// 🔥 SMART CTA (only if no image was sent)
-if (!mediaUrl) {
-  reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it for you.";
-}
-
-// 🔥 Force text before links to avoid preview
-reply = "🐾 PetAssist Analysis\n\n" + reply;
-
-// 🔥 LIMIT ONLY AI TEXT BEFORE FORMATTING
+// ✅ SINGLE declaration (FIXED)
 let aiReply = response.data.choices[0].message.content;
 
+// 🔥 LIMIT AI RESPONSE
 if (aiReply.length > 700) {
   aiReply = aiReply.substring(0, 700) + "...";
 }
 
-// 🔥 APPEND VETS BACK
+// 🔥 BASE REPLY
+let reply = aiReply;
+
+// 🔥 CTA (only if no image)
+if (!mediaUrl) {
+  reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
+}
+
+// 🔥 FINAL FORMAT (NO DUPLICATES, NO CRASH)
 reply = `🐾 PetAssist Analysis
 
 ${reply}
