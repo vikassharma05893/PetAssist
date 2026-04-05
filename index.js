@@ -274,14 +274,7 @@ if (aiReply.length > 700) {
 // 🔥 BASE REPLY
 let reply = aiReply;
 
-// 🔥 CTA LOGIC
-
-// TEXT ONLY → ask for image
-if (!isImageValid) {
-  reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
-}
-
-// 🔥 CTA LOGIC
+// 🔥 CTA LOGIC (CLEAN)
 
 if (!isImageValid) {
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
