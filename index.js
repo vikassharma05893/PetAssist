@@ -130,7 +130,41 @@ Tell me what's wrong with your pet and I’ll help you instantly.
       console.log("Vet error:", e.message);
     }
 
-    // ================= AI =================
+    // ================= EYE CHECK FLOW =================
+if (text.includes("eye check")) {
+  const eyeGuide = `
+👁️ *Advanced Eye Check*
+
+1️⃣ Share a picture of your pet’s eyes:
+Upload a clear close-up of both eyes in natural light (no flash)
+
+2️⃣ Capture properly:
+• Both eyes visible (front view)
+• No flash, good lighting
+• Sharp focus on pupil/iris
+• Include eyelids/discharge
+• Optional: one dim-light photo
+
+3️⃣ What we look for:
+• Dilated pupils → stress/pain  
+• Unequal pupils → neurological (urgent)  
+• Redness/swelling → infection/allergy  
+• Yellow/green discharge → bacterial infection  
+• Cloudiness → corneal issue/cataract  
+
+4️⃣ Quick triage:
+🟢 Mild redness → monitor  
+🟡 Discharge → vet soon  
+🔴 Unequal pupils/cloudy eye → urgent  
+
+📸 Send the eye image when ready.
+`;
+
+  res.set("Content-Type", "text/xml");
+  return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
+}
+
+// ================= AI =================
 let imageInput = null;
 
 let isImageValid = false;
@@ -246,8 +280,17 @@ if (aiReply.length > 700) {
 // 🔥 BASE REPLY
 let reply = aiReply;
 
-// 🔥 CTA (only if no image)
+// 🔥 CTA LOGIC
+
+// TEXT ONLY → ask for image
 if (!isImageValid) {
+  reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
+}
+
+// IMAGE → suggest advanced check
+else {
+  reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet’s eyes.";
+}
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
 }
 
