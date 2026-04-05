@@ -55,7 +55,6 @@ if (greetings.some(g => text.startsWith(g))) {
 
 Tell me what's wrong with your pet and I’ll help you instantly.
 
-📸 Want a more accurate answer? Send a photo of your pet.
 `;
 
   res.set("Content-Type", "text/xml");
@@ -127,9 +126,9 @@ If the user sends ONLY text:
 - Respond normally based on symptoms.
 
 If the user sends an image:
-- Analyze visible symptoms carefully
-- Do NOT assume beyond what is visible
-- Give practical next steps.
+- Focus ONLY on what is visible in the image
+- Do NOT guess unrelated conditions
+- If unclear, say "image is not clear enough"
 
 If an image is already provided:
 - Do NOT ask for another image
@@ -162,8 +161,19 @@ STRICT RULES:
       {
         role: "user",
         content: mediaUrl
-          ? `${userMessage || "Analyze this pet condition"}\n\n[Image attached: analyze possible symptoms carefully]`
-          : userMessage,
+  ? [
+      {
+        type: "text",
+        text: `${userMessage || "Analyze this pet condition"}`
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: mediaUrl
+        }
+      }
+    ]
+  : userMessage,
       },
     ],
   },
@@ -192,7 +202,8 @@ if (!mediaUrl) {
 }
 
 // 🔥 FINAL FORMAT (NO DUPLICATES, NO CRASH)
-reply = `🐾 PetAssist Analysis
+if (!mediaUrl) {
+  reply = `🐾 PetAssist Analysis
 
 ${reply}
 
@@ -200,6 +211,11 @@ ${reply}
 🏥 Nearby Vets:
 ${vetList}
 ━━━━━━━━━━━━━━━`;
+} else {
+  reply = `🐾 PetAssist Analysis
+
+${reply}`;
+}
 
     // ================= XML SAFE =================
     reply = reply
