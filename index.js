@@ -7,6 +7,27 @@ const { getRecommendations, extractLocation } = require("./logic");
 const getNearbyVets = require("./vets");
 
 const app = express();
+async function downloadImageAsBase64(url) {
+  try {
+    const response = await axios.get(url, {
+      responseType: "arraybuffer",
+      auth: {
+        username: process.env.TWILIO_SID,
+        password: process.env.TWILIO_AUTH_TOKEN,
+      },
+    });
+
+    // ✅ Detect actual image type (jpeg/png/webp)
+    const contentType = response.headers["content-type"] || "image/jpeg";
+
+    const base64 = Buffer.from(response.data, "binary").toString("base64");
+
+    return `data:${contentType};base64,${base64}`;
+  } catch (err) {
+    console.log("❌ Image download error:", err.message);
+    return null;
+  }
+}
 
 // ✅ Twilio parsing
 app.use(express.text({ type: "*/*" }));
@@ -110,6 +131,30 @@ Tell me what's wrong with your pet and I’ll help you instantly.
     }
 
     // ================= AI =================
+let imageInput = null;
+
+let isImageValid = false;
+
+if (mediaUrl) {
+  const base64Image = await downloadImageAsBase64(mediaUrl);
+
+  if (base64Image) {
+    isImageValid = true;
+
+    imageInput = [
+      {
+        type: "text",
+        text: userMessage || "Analyze this pet condition"
+      },
+      {
+        type: "image_url",
+        image_url: {
+          url: base64Image
+        }
+      }
+    ];
+  }
+}
 const response = await axios.post(
   "https://api.openai.com/v1/chat/completions",
   {
@@ -160,20 +205,7 @@ STRICT RULES:
       },
       {
         role: "user",
-        content: mediaUrl
-  ? [
-      {
-        type: "text",
-        text: `${userMessage || "Analyze this pet condition"}`
-      },
-      {
-        type: "image_url",
-        image_url: {
-          url: mediaUrl
-        }
-      }
-    ]
-  : userMessage,
+        content: imageInput || userMessage,
       },
     ],
   },
@@ -197,12 +229,12 @@ if (aiReply.length > 700) {
 let reply = aiReply;
 
 // 🔥 CTA (only if no image)
-if (!mediaUrl) {
+if (!isImageValid) {
   reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
 }
 
 // 🔥 FINAL FORMAT (NO DUPLICATES, NO CRASH)
-if (!mediaUrl) {
+if (!isImageValid) {
   reply = `🐾 PetAssist Analysis
 
 ${reply}

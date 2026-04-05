@@ -7,7 +7,12 @@
     "start": "node index.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
-  "keywords": ["pet", "whatsapp", "twilio", "ai"],
+  "keywords": [
+    "pet",
+    "whatsapp",
+    "twilio",
+    "ai"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
