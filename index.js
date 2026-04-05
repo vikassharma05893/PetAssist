@@ -31,6 +31,13 @@ app.post("/whatsapp", async (req, res) => {
 
     userMessage = userMessage.trim();
     const text = userMessage.toLowerCase();
+let mediaUrl = null;
+
+if (req.body.NumMedia && req.body.NumMedia !== "0") {
+  mediaUrl = req.body.MediaUrl0;
+}
+
+console.log("📸 Media URL:", mediaUrl);
 
     console.log("📩 Message:", userMessage);
 logQuery(userMessage);
@@ -44,8 +51,10 @@ if (greetings.includes(text)) {
 Tell me what's wrong with your pet and I’ll help you instantly.
 `;
 
-  res.set("Content-Type", "text/xml");
-  return res.send(`<Response><Message>${welcome}</Message></Response>`);
+  reply += "\n\n📸 Want a more accurate answer? Send a photo of your pet.";
+
+res.set("Content-Type", "text/xml");
+res.send(`<Response><Message>${reply}</Message></Response>`);
 }
 
     // ================= FAST ACK =================
@@ -88,7 +97,7 @@ Tell me what's wrong with your pet and I’ll help you instantly.
   .slice(0, 3)
   .map((v, i) =>
   `🐾 *${i + 1}. ${v.name}* (⭐ ${v.rating})
-📍 https://maps.google.com/?q=${encodeURIComponent(v.name)}`
+📍 Tap to open: ${v.link}`
 )
   .join("\n\n");
       }
@@ -100,14 +109,31 @@ Tell me what's wrong with your pet and I’ll help you instantly.
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: `
-You are a pet health assistant.
+content: `
+You are a smart pet health assistant.
 
-Give SHORT WhatsApp-friendly responses.
+Give SHORT, clear, WhatsApp-friendly responses.
+
+If the user sends ONLY text:
+- Respond normally based on symptoms.
+
+If the user sends an image:
+- Analyze visible symptoms carefully
+- Do NOT assume beyond what is visible
+- Give practical next steps
+
+If the user sends BOTH text + image:
+- Combine both inputs for better diagnosis
+
+Always:
+- Avoid panic
+- Be clear and actionable
+- Keep response structured (Issue, Severity, What to do)
+`
 
 STRICT RULES:
 - Max 6 lines
@@ -130,7 +156,15 @@ STRICT RULES:
 1 short line only
 `,
           },
-          { role: "user", content: userMessage },
+          {
+  role: "user",
+  content: mediaUrl
+    ? [
+        { type: "text", text: userMessage || "Analyze this pet condition" },
+        { type: "image_url", image_url: { url: mediaUrl } }
+      ]
+    : userMessage,
+},
         ],
       },
       {
@@ -142,6 +176,14 @@ STRICT RULES:
     );
 
     let reply = response.data.choices[0].message.content;
+
+// 🔥 SMART CTA (only if no image was sent)
+if (!mediaUrl) {
+  reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it for you.";
+}
+
+// 🔥 Force text before links to avoid preview
+reply = "🐾 PetAssist Analysis\n\n" + reply;
 
 // 🔥 LIMIT AI PART ONLY
 if (reply.length > 800) {

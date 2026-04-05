@@ -19,7 +19,7 @@ const results = response.data.results.slice(0, 3);
       name: place.name,
       rating: place.rating || "N/A",
       address: place.formatted_address,
-      link: `https://www.google.com/maps/search/?api=1&query_place_id=${place.place_id}&query=${encodeURIComponent(place.name)}`,
+      link: `maps.google.com/?q=${encodeURIComponent(place.name + " " + place.formatted_address)}`,
     }));
 
   } catch (error) {
