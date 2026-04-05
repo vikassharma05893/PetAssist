@@ -90,6 +90,15 @@ Upload a clear close-up of both eyes in natural light (no flash)
 let mediaUrl = null;
 
 if (typeof req.body === "string") {
+  const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
+  if (mediaMatch) {
+    mediaUrl = decodeURIComponent(mediaMatch[1]);
+  }
+} else if (req.body) {
+  mediaUrl = req.body.MediaUrl0 || null;
+}
+
+console.log("📸 Media URL:", mediaUrl);
     // ================= GREETING =================
     const greetings = ["hi", "hello", "hey"];
 
@@ -154,8 +163,6 @@ Tell me what's wrong with your pet and I’ll help you instantly.
     }
 
 
-  res.set("Content-Type", "text/xml");
-  return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
 }
 
 // ================= AI =================
@@ -289,7 +296,11 @@ const isGreeting =
   text.startsWith("hey");
 
 // 🔥 DETECT IMAGE + TEXT
-const isImageWithText = isImageValid && userMessage && userMessage.trim().length > 0;
+const isImageWithText =
+  isImageValid &&
+  userMessage &&
+  userMessage.trim().length > 3 &&
+  !["hi", "hello", "hey"].includes(text);
 
 // 🔥 FINAL FORMAT LOGIC
 
