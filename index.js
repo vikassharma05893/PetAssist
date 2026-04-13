@@ -8,7 +8,7 @@ const getNearbyVets = require("./vets");
 const app = express();
 const userRepo = {}; // In-memory user data repository
 
-// Function to analyze images using provided parameters
+// ================= ANALYZE IMAGE FROM URL (PRESERVED) =================
 async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, cost, food) {
     try {
         const { reply, isImageValid } = await analyzeImage({
@@ -27,7 +27,7 @@ async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, c
     }
 }
 
-// Function to download image and convert to base64
+// ================= DOWNLOAD IMAGE AS BASE64 =================
 async function downloadImageAsBase64(url) {
     try {
         const response = await axios.get(url, {
@@ -49,7 +49,31 @@ async function downloadImageAsBase64(url) {
     }
 }
 
-// Twilio parsing
+// ================= TYPING SIMULATION VIA TWILIO =================
+// Sends a "thinking" message to simulate typing, then the real reply follows
+async function sendTypingIndicator(toNumber, fromNumber) {
+    try {
+        await axios.post(
+            `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
+            new URLSearchParams({
+                From: fromNumber,
+                To: toNumber.startsWith("whatsapp:") ? toNumber : `whatsapp:+${toNumber.replace(/^\+/, "")}`,
+                Body: "🐾 PetAssist is analyzing...\n⏳ Please wait a moment.",
+            }),
+            {
+                auth: {
+                    username: process.env.TWILIO_SID,
+                    password: process.env.TWILIO_AUTH_TOKEN,
+                },
+            }
+        );
+        console.log("✅ Typing indicator sent");
+    } catch (err) {
+        console.log("❌ Typing indicator error:", err.response?.data || err.message);
+    }
+}
+
+// ================= TWILIO PARSING =================
 app.use(express.text({ type: "*/*" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -73,7 +97,7 @@ app.post("/whatsapp", async (req, res) => {
         const text = userMessage.toLowerCase();
 
         // Check for user ID and initialize user repository if not present
-        const fromNumber = req.body.From ? req.body.From : ""; // Extract from Twilio request
+        const fromNumber = req.body && req.body.From ? req.body.From : ""; // Extract from Twilio request
         if (!userRepo[fromNumber]) {
             userRepo[fromNumber] = { interactionHistory: [] }; // Initialize repo for new user
         }
@@ -83,44 +107,8 @@ app.post("/whatsapp", async (req, res) => {
         // Log the current inquiry
         logQuery(userId, userMessage);
 
-        // ✅ STEP 1: AI EYE CONTEXT DETECTION
-        const isEyeCheckFlow =
-            text.includes("eye") ||
-            text.includes("pupil") ||
-            text.includes("vision");
-
-        // ================= EYE CHECK FLOW =================
-        if (isEyeCheckFlow) {
-            const eyeGuide = `
-👁️ *Advanced Eye Check*
-
-1️⃣ Share a picture of your pet’s eyes:
-Upload a clear close-up of both eyes in natural light (no flash)
-
-2️⃣ Capture properly:
-• Both eyes visible (front view)
-• No flash, good lighting
-• Sharp focus on pupil/iris
-• Include eyelids/discharge
-• Optional: one dim-light photo
-
-3️⃣ What we look for:
-• Dilated pupils → stress/pain  
-• Unequal pupils → neurological (urgent)  
-• Redness/swelling → infection/allergy  
-• Yellow/green discharge → bacterial infection  
-• Cloudiness → corneal issue/cataract  
-
-4️⃣ Quick triage:
-🟢 Mild redness → monitor  
-🟡 Discharge → vet soon  
-🔴 Unequal pupils/cloudy eye → urgent  
-`;
-            res.set("Content-Type", "text/xml");
-            return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
-        }
-
         // ================= MEDIA URL EXTRACTION =================
+        // ✅ MUST be before eye check so we know if image was sent
         let mediaUrl = null;
 
         if (typeof req.body === "string") {
@@ -134,27 +122,69 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
         console.log("📸 Media URL:", mediaUrl);
 
-        // ================= GREETING =================
+        // ✅ STEP 1: AI EYE CONTEXT DETECTION
+        const isEyeCheckFlow =
+            text.includes("eye") ||
+            text.includes("pupil") ||
+            text.includes("vision");
+
+        // ================= EYE CHECK GUIDE (text only, no image sent yet) =================
+        // ✅ Only show guide if user asked about eyes but has NOT sent an image yet
+        if (isEyeCheckFlow && !mediaUrl) {
+            const eyeGuide = `👁️ *Advanced Eye Check*
+
+1️⃣ *Share a picture of your pet's eyes:*
+Upload a clear close-up of both eyes in natural light (no flash)
+
+📸 *Image Capture Parameters:*
+• Both eyes visible (front view)
+• No flash, good natural lighting
+• Sharp focus on pupil/iris
+• Include eyelids & discharge area
+• Optional: one dim-light shot for pupil dilation
+
+2️⃣ *What we look for:*
+• Dilated pupils → stress/pain  
+• Unequal pupils → neurological (urgent)  
+• Redness/swelling → infection/allergy  
+• Yellow/green discharge → bacterial infection  
+• Cloudiness → corneal issue/cataract  
+
+3️⃣ *Quick triage:*
+🟢 Mild redness → monitor  
+🟡 Discharge → vet soon  
+🔴 Unequal pupils/cloudy eye → urgent  
+
+📤 Send the eye image when ready and I'll analyze it instantly!`;
+
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
+        }
+
+        // ================= GREETING (no image) =================
         const greetings = ["hi", "hello", "hey"];
-        if (greetings.some((g) => text.startsWith(g))) {
-            const welcome = `
-🐾 Hi! I'm PetAssist 🐶🐱
-Tell me what's wrong with your pet and I’ll help you instantly.
-`;
+        if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
+            const welcome = `🐾 *Hi! I'm PetAssist* 🐶🐱
+
+I'm your AI-powered pet health assistant!
+
+Here's what I can do:
+🔍 Analyze pet symptoms (text or photo)
+👁️ Eye check & diagnosis
+🏥 Find nearby vets
+💊 Health & food advice
+
+👉 Just tell me what's wrong with your pet, or send a photo for instant analysis!`;
+
             res.set("Content-Type", "text/xml");
             return res.send(`<Response><Message>${welcome}</Message></Response>`);
         }
 
-    } catch (error) {
-        console.error("Error processing WhatsApp request:", error);
-        res.status(500).send("Internal Server Error");
-    }
-});
-
-
-        // ================= FAST ACK =================
+        // ================= FAST ACK (Typing Simulation via TwiML) =================
+        // This is sent immediately as the "typing indicator" effect on WhatsApp
         res.set("Content-Type", "text/xml");
-        res.send(`<Response><Message>🐾 Got your message. Working on it...</Message></Response>`);
+        res.send(`<Response><Message>🐾 Got your message!
+⏳ Analyzing now... please wait a moment.</Message></Response>`);
 
         // ================= BACKGROUND PROCESS =================
         setTimeout(async () => {
@@ -179,7 +209,7 @@ Tell me what's wrong with your pet and I’ll help you instantly.
                     console.log("Vet error:", e.message);
                 }
 
-                // ================= AI =================
+                // ================= AI IMAGE PROCESSING =================
                 let imageInput = null;
                 let isImageValid = false;
 
@@ -202,6 +232,7 @@ Tell me what's wrong with your pet and I’ll help you instantly.
                     }
                 }
 
+                // ================= OPENAI API CALL =================
                 const response = await axios.post(
                     "https://api.openai.com/v1/chat/completions",
                     {
@@ -334,9 +365,9 @@ STRICT RULES:
 
                 // 🔥 CTA LOGIC (CLEAN)
                 if (!isImageValid) {
-                    reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
+                    reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I'll analyze it.";
                 } else {
-                    reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet’s eyes.";
+                    reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet's eyes.";
                 }
 
                 // 🔥 DETECT GREETING
@@ -351,47 +382,47 @@ STRICT RULES:
                 // 🔥 FINAL FORMAT LOGIC
                 // ✅ IMAGE + TEXT FIRST MESSAGE → Greeting + Vets
                 if (isImageWithText && !isGreeting) {
-                    reply = `🐾 Hi! I'm PetAssist 🐶🐱
+                    reply = `🐾 *Hi! I'm PetAssist* 🐶🐱
 
 Here's what I found:
 
 ${reply}
 
 ━━━━━━━━━━━━━━━
-🏥 Nearby Vets:
+🏥 *Nearby Vets:*
 ${vetList}
 ━━━━━━━━━━━━━━━`;
                 }
                 // ✅ TEXT ONLY → Analysis + Vets
                 else if (!isImageValid) {
-                    reply = `🐾 PetAssist Analysis
+                    reply = `🐾 *PetAssist Analysis*
 
 ${reply}
 
 ━━━━━━━━━━━━━━━
-🏥 Nearby Vets:
+🏥 *Nearby Vets:*
 ${vetList}
-━━━━━━━━━━━━━`;
+━━━━━━━━━━━━━━━`;
                 }
                 // ✅ IMAGE ONLY → Analysis only
                 else {
-                    reply = `🐾 PetAssist Analysis
+                    reply = `🐾 *PetAssist Analysis*
 
 ${reply}`;
                 }
 
                 // ================= XML SAFE =================
                 reply = reply
+                    .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
 
-                // ================= SEND VIA TWILIO =================
+                // ================= SEND FINAL REPLY VIA TWILIO =================
                 await axios.post(
                     `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
                     new URLSearchParams({
                         From: "whatsapp:+14155238886",
-                        To: fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:+${fromNumber.replace(/^\+/, '')}`,
-
+                        To: fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:+${fromNumber.replace(/^\+/, "")}`,
                         Body: reply,
                     }),
                     {
@@ -407,11 +438,12 @@ ${reply}`;
                 console.log("❌ Background error:", err.response?.data || err.message);
             }
         }, 0);
+
     } catch (error) {
         console.error(error.message);
         if (!res.headersSent) {
             res.set("Content-Type", "text/xml");
-            res.send(`<Response><Message>⚠️ Error</Message></Response>`);
+            res.send(`<Response><Message>⚠️ Oops! Something went wrong. Please try again.</Message></Response>`);
         }
     }
 });
