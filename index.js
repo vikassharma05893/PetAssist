@@ -73,12 +73,12 @@ app.post("/whatsapp", async (req, res) => {
         const text = userMessage.toLowerCase();
 
         // Check for user ID and initialize user repository if not present
-        let userId = ""; // Extract based on the user context
         const fromNumber = req.body.From ? req.body.From : ""; // Extract from Twilio request
         if (!userRepo[fromNumber]) {
             userRepo[fromNumber] = { interactionHistory: [] }; // Initialize repo for new user
         }
-        userId = fromNumber; // Assuming From number is unique user ID
+
+        const userId = fromNumber; // Assuming From number is a unique user ID
 
         // Log the current inquiry
         logQuery(userId, userMessage);
@@ -90,7 +90,7 @@ app.post("/whatsapp", async (req, res) => {
             text.includes("vision");
 
         // ================= EYE CHECK FLOW =================
-        if (["eye check", "eye", "check eye"].includes(text)) {
+        if (isEyeCheckFlow) {
             const eyeGuide = `
 👁️ *Advanced Eye Check*
 
@@ -115,43 +115,41 @@ Upload a clear close-up of both eyes in natural light (no flash)
 🟢 Mild redness → monitor  
 🟡 Discharge → vet soon  
 🔴 Unequal pupils/cloudy eye → urgent  
-
-// ================= EYE CHECK FLOW =================
-if (["eye check", "eye", "check eye"].includes(text)) {
-    const eyeGuide = `
-👁️ *Advanced Eye Check*
-1️⃣ Share a picture of your pet’s eyes: 
-(Instructions...)
-📸 Send the eye image when ready.
 `;
-    res.set("Content-Type", "text/xml");
-    return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
-}
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
+        }
 
-// ================= MEDIA URL EXTRACTION =================
-let mediaUrl = null;
+        // ================= MEDIA URL EXTRACTION =================
+        let mediaUrl = null;
 
-if (typeof req.body === "string") {
-    const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
-    if (mediaMatch) {
-        mediaUrl = decodeURIComponent(mediaMatch[1]);
-    }
-} else if (req.body) {
-    mediaUrl = req.body.MediaUrl0 || null;
-}
+        if (typeof req.body === "string") {
+            const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
+            if (mediaMatch) {
+                mediaUrl = decodeURIComponent(mediaMatch[1]);
+            }
+        } else if (req.body) {
+            mediaUrl = req.body.MediaUrl0 || null;
+        }
 
-console.log("📸 Media URL:", mediaUrl);
+        console.log("📸 Media URL:", mediaUrl);
 
-// ================= GREETING =================
-const greetings = ["hi", "hello", "hey"];
-if (greetings.some((g) => text.startsWith(g))) {
-    const welcome = `
+        // ================= GREETING =================
+        const greetings = ["hi", "hello", "hey"];
+        if (greetings.some((g) => text.startsWith(g))) {
+            const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 Tell me what's wrong with your pet and I’ll help you instantly.
 `;
-    res.set("Content-Type", "text/xml");
-    return res.send(`<Response><Message>${welcome}</Message></Response>`);
-}
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response><Message>${welcome}</Message></Response>`);
+        }
+
+    } catch (error) {
+        console.error("Error processing WhatsApp request:", error);
+        res.status(500).send("Internal Server Error");
+    }
+});
 
 
         // ================= FAST ACK =================
