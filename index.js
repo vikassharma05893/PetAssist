@@ -385,7 +385,8 @@ ${reply}`;
                     `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
                     new URLSearchParams({
                         From: "whatsapp:+14155238886",
-                        To: fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:${fromNumber}`,
+                        To: fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:+${fromNumber.replace(/^\+/, '')}`,
+
                         Body: reply,
                     }),
                     {
