@@ -1,5 +1,4 @@
 require("dotenv").config();
-
 const express = require("express");
 const axios = require("axios");
 const logQuery = require("./logger");
@@ -7,6 +6,7 @@ const { getRecommendations, extractLocation } = require("./logic");
 const getNearbyVets = require("./vets");
 
 const app = express();
+const userRepo = {}; // In-memory user data repository
 
 // Function to analyze images using provided parameters
 async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, cost, food) {
@@ -72,6 +72,17 @@ app.post("/whatsapp", async (req, res) => {
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
 
+        // Check for user ID and initialize user repository if not present
+        let userId = ""; // Extract based on the user context
+        const fromNumber = req.body.From ? req.body.From : ""; // Extract from Twilio request
+        if (!userRepo[fromNumber]) {
+            userRepo[fromNumber] = { interactionHistory: [] }; // Initialize repo for new user
+        }
+        userId = fromNumber; // Assuming From number is unique user ID
+
+        // Log the current inquiry
+        logQuery(userId, userMessage);
+
         // ✅ STEP 1: AI EYE CONTEXT DETECTION
         const isEyeCheckFlow =
             text.includes("eye") ||
@@ -126,7 +137,7 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
         // ================= GREETING =================
         const greetings = ["hi", "hello", "hey"];
-        if (greetings.some(g => text.startsWith(g))) {
+        if (greetings.some((g) => text.startsWith(g))) {
             const welcome = `
 🐾 Hi! I'm PetAssist 🐶🐱
 
@@ -143,25 +154,6 @@ Tell me what's wrong with your pet and I’ll help you instantly.
         // ================= BACKGROUND PROCESS =================
         setTimeout(async () => {
             try {
-                // ================= EXTRACT FROM NUMBER =================
-                let fromNumber = "";
-                if (typeof req.body === "string") {
-                    const match = req.body.match(/From=([^&]*)/);
-                    if (match) {
-                        fromNumber = decodeURIComponent(match[1]);
-                    }
-                } else if (req.body && req.body.From) {
-                    fromNumber = req.body.From;
-                }
-
-                console.log("📤 Sending to:", fromNumber);
-
-                // ❌ Safety check
-                if (!fromNumber) {
-                    console.log("❌ No valid From number");
-                    return;
-                }
-
                 // ================= LOGIC =================
                 const { cost, vet, food } = getRecommendations(userMessage);
                 const location = extractLocation(userMessage);
@@ -193,14 +185,14 @@ Tell me what's wrong with your pet and I’ll help you instantly.
                         imageInput = [
                             {
                                 type: "text",
-                                text: userMessage || "Analyze this pet condition"
+                                text: userMessage || "Analyze this pet condition",
                             },
                             {
                                 type: "image_url",
                                 image_url: {
-                                    url: base64Image
-                                }
-                            }
+                                    url: base64Image,
+                                },
+                            },
                         ];
                     }
                 }
@@ -328,6 +320,13 @@ STRICT RULES:
                 // 🔥 BASE REPLY
                 let reply = aiReply;
 
+                // Update user interaction history
+                userRepo[userId].interactionHistory.push({
+                    timestamp: new Date(),
+                    userMessage,
+                    aiReply,
+                });
+
                 // 🔥 CTA LOGIC (CLEAN)
                 if (!isImageValid) {
                     reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I’ll analyze it.";
@@ -345,7 +344,6 @@ STRICT RULES:
                     !["hi", "hello", "hey"].includes(text);
 
                 // 🔥 FINAL FORMAT LOGIC
-
                 // ✅ IMAGE + TEXT FIRST MESSAGE → Greeting + Vets
                 if (isImageWithText && !isGreeting) {
                     reply = `🐾 Hi! I'm PetAssist 🐶🐱
@@ -359,8 +357,7 @@ ${reply}
 ${vetList}
 ━━━━━━━━━━━━━━━`;
                 }
-
-                // ✅ TEXT ONLY → Analysis + Vets (unchanged)
+                // ✅ TEXT ONLY → Analysis + Vets
                 else if (!isImageValid) {
                     reply = `🐾 PetAssist Analysis
 
@@ -369,10 +366,9 @@ ${reply}
 ━━━━━━━━━━━━━━━
 🏥 Nearby Vets:
 ${vetList}
-━━━━━━━━━━━━━━━`;
+━━━━━━━━━━━━━`;
                 }
-
-                // ✅ IMAGE ONLY → Analysis only (unchanged)
+                // ✅ IMAGE ONLY → Analysis only
                 else {
                     reply = `🐾 PetAssist Analysis
 
@@ -417,6 +413,16 @@ ${reply}`;
 // ================= ROOT =================
 app.get("/", (req, res) => {
     res.send("PetAssist API is running 🚀");
+});
+
+// ================= USER INTERACTION HISTORY ENDPOINT =================
+app.get("/history", (req, res) => {
+    const userId = req.query.userId; // Expect userId to be passed as a query parameter
+    if (userRepo[userId]) {
+        res.json(userRepo[userId].interactionHistory);
+    } else {
+        res.status(404).json({ message: "User not found" });
+    }
 });
 
 // ================= SERVER =================
