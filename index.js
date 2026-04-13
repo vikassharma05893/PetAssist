@@ -99,7 +99,7 @@ app.post("/whatsapp", async (req, res) => {
         // Check for user ID and initialize user repository if not present
         const fromNumber = req.body && req.body.From ? req.body.From : ""; // Extract from Twilio request
         if (!userRepo[fromNumber]) {
-            userRepo[fromNumber] = { interactionHistory: [] }; // Initialize repo for new user
+            userRepo[fromNumber] = { interactionHistory: [], petInfo: {} }; // Initialize repo for new user
         }
 
         const userId = fromNumber; // Assuming From number is a unique user ID
@@ -117,7 +117,7 @@ app.post("/whatsapp", async (req, res) => {
                 mediaUrl = decodeURIComponent(mediaMatch[1]);
             }
         } else if (req.body) {
-            mediaUrl = req.body.MediaUrl0 || null;
+            mediaUrl = req.body.MediaUrl0 || req.body.MediaUrl || null; // Added generic MediaUrl check
         }
 
         console.log("📸 Media URL:", mediaUrl);
@@ -129,7 +129,6 @@ app.post("/whatsapp", async (req, res) => {
             text.includes("vision");
 
         // ================= EYE CHECK GUIDE (text only, no image sent yet) =================
-        // ✅ Only show guide if user asked about eyes but has NOT sent an image yet
         if (isEyeCheckFlow && !mediaUrl) {
             const eyeGuide = `👁️ *Advanced Eye Check*
 
@@ -168,13 +167,11 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
 I'm your AI-powered pet health assistant!
 
-Here's what I can do:
-🔍 Analyze pet symptoms (text or photo)
-👁️ Eye check & diagnosis
-🏥 Find nearby vets
-💊 Health & food advice
+Before we begin, could you please provide some details about your pet?
+1️⃣ *What is your pet's name?*
+2️⃣ *What is your pet's age?*
 
-👉 Just tell me what's wrong with your pet, or send a photo for instant analysis!`;
+Once I have this information, I can assist you better!`;
 
             res.set("Content-Type", "text/xml");
             return res.send(`<Response><Message>${welcome}</Message></Response>`);
