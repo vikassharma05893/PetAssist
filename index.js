@@ -302,18 +302,18 @@ How old is *${petName}*?
 
         // STEP 2: Pet Age → Complete onboarding
         if (user.onboardingStep === "pet_awaiting_age" && !mediaUrl) {
-    const petAge = userMessage.trim();
-    const petName = user.petInfo.name;
+            const petAge = userMessage.trim();
+            const petName = user.petInfo.name;
 
-    console.log("Received pet age:", petAge);
-    
-    user.petInfo.age = petAge;
-    user.onboardingStep = "complete";
+            console.log("Received pet age:", petAge);
+            
+            user.petInfo.age = petAge;
+            user.onboardingStep = "complete";
 
-    console.log("Onboarding complete for:", petName);
+            console.log("Onboarding complete for:", petName);
 
-    return xmlReply(res,
-        `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+            return xmlReply(res,
+                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
 
 I'm all set to help keep *${petName}* healthy and happy!
 
@@ -324,9 +324,8 @@ Here's what I can do:
 💊 Health & food advice
 
 👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!`
-    );
-}
-
+            );
+        }
 
         // =================================================================
         // ================= ANIMAL RESCUER ONBOARDING FLOW ===============
