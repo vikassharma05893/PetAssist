@@ -223,37 +223,93 @@ Reply with *1*, *2*, or *3*.`
         }
 
         // =================================================================
-        // ================= PET PARENT ONBOARDING FLOW ===================
-        // =================================================================
+// ================= PET PARENT ONBOARDING FLOW ===================
+// =================================================================
 
-        // STEP 1: Pet Name
-        if (user.onboardingStep === "pet_awaiting_name") {
-            const petName = userMessage.trim();
-            user.petInfo.name = petName;
-            user.onboardingStep = "pet_awaiting_age";
+// STEP 1: Pet Name
+if (user.onboardingStep === "pet_awaiting_name") {
+    const petName = userMessage.trim();
 
-            return xmlReply(res,
-                `🐾 *${petName}* — what a fantastic name! 🐾
+    // --- Validation ---
+    if (!petName || petName.length < 1) {
+        console.log("[STEP 1] Invalid pet name input:", petName);
+        return xmlReply(res,
+            `⚠️ Hmm, I didn't catch that!
+
+Please tell me your pet's name. (e.g. *Bruno*, *Milo*, *Luna*)`
+        );
+    }
+
+    console.log("[STEP 1] Pet name received:", petName);
+
+    user.petInfo.name = petName;
+    user.onboardingStep = "pet_awaiting_age";
+
+    console.log("[STEP 1] Step updated to pet_awaiting_age for user:", user);
+
+    return xmlReply(res,
+        `🐾 *${petName}* — what a fantastic name! 🐾
 
 How old is *${petName}*?
 (e.g. 2 years, 6 months)`
-            );
-        }
+    );
+}
 
-        // STEP 2: Pet Age → Complete onboarding
-        if (user.onboardingStep === "pet_awaiting_age") {
-            const petAge = userMessage.trim();
-            const petName = user.petInfo.name;
+// STEP 2: Pet Age → Complete onboarding
+if (user.onboardingStep === "pet_awaiting_age") {
+    const petAge = userMessage.trim();
+    const petName = user.petInfo?.name;
 
-            console.log("Received pet age:", petAge);
-            
-            user.petInfo.age = petAge;
-            user.onboardingStep = "complete";
+    console.log("[STEP 2] Entered pet_awaiting_age block");
+    console.log("[STEP 2] Raw userMessage:", userMessage);
+    console.log("[STEP 2] Trimmed petAge:", petAge);
+    console.log("[STEP 2] petName from user.petInfo:", petName);
 
-            console.log("Onboarding complete for:", petName);
+    // --- Guard: Check petName exists ---
+    if (!petName) {
+        console.log("[STEP 2] ERROR: petName is missing from user.petInfo");
+        return xmlReply(res,
+            `⚠️ Something went wrong. Let's start over.
 
-            return xmlReply(res,
-                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+🐶 *What's your pet's name?*`
+        );
+        user.onboardingStep = "pet_awaiting_name";
+    }
+
+    // --- Validation: Check petAge is not empty ---
+    if (!petAge || petAge.length < 1) {
+        console.log("[STEP 2] Invalid age input - empty or null:", petAge);
+        return xmlReply(res,
+            `⚠️ I didn't catch that!
+
+How old is *${petName}*?
+(e.g. *2 years*, *6 months*)`
+        );
+    }
+
+    // --- Validation: Check petAge format ---
+    const agePattern = /^\d+\s*(years?|months?|weeks?)$/i;
+    if (!agePattern.test(petAge)) {
+        console.log("[STEP 2] Invalid age format:", petAge);
+        return xmlReply(res,
+            `⚠️ Please use a simple format like:
+- *2 years*
+- *6 months*
+- *3 weeks*
+
+How old is *${petName}*?`
+        );
+    }
+
+    // --- All good, complete onboarding ---
+    user.petInfo.age = petAge;
+    user.onboardingStep = "complete";
+
+    console.log("[STEP 2] Onboarding complete. petInfo:", user.petInfo);
+    console.log("[STEP 2] User state after completion:", user);
+
+    return xmlReply(res,
+        `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
 
 I'm all set to help keep *${petName}* healthy and happy!
 
@@ -264,8 +320,9 @@ Here's what I can do:
 💊 Health & food advice
 
 👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!`
-            );
-        }
+    );
+}
+
 
         // =================================================================
         // ================= MAIN AI ANALYSIS (ALL ROLES) ==================
