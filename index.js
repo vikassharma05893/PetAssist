@@ -133,30 +133,7 @@ app.post("/whatsapp", async (req, res) => {
         console.log("User Number:", fromNumber); // Debug log for the user's number
         console.log("User Message:", userMessage); // Debug log for the user's message
 
-        // Continue with your existing logic...
-
-        res.status(200).send("Message processed");
-    } catch (error) {
-        console.error("Error processing the request:", error);
-        res.status(500).send("Internal Server Error");
-    }
-});
-
-
         // ================= USER REPO INIT =================
-        let fromNumber = "";
-
-        if (typeof req.body === "string") {
-            const fromMatch = req.body.match(/From=([^&]*)/);
-            if (fromMatch) {
-                fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " ")).trim();
-            }
-        } else if (req.body && req.body.From) {
-            fromNumber = req.body.From;
-        }
-
-        console.log("📞 From Number Extracted:", fromNumber); // Debug log
-
         initUser(fromNumber);
 
         const userId = fromNumber;
@@ -201,30 +178,27 @@ Upload a clear close-up of both eyes in natural light (no flash)
         }
 
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
-const greetings = ["hi", "hello", "hey"];
-if (greetings.some((g) => text.startsWith(g))) {
-    // Reset user so they can re-onboard
-    delete userRepo[fromNumber]; // Delete existing user before re-initializing
-    initUser(fromNumber);
-    userRepo[fromNumber].onboardingStep = "awaiting_role";
- 
-    const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
-    
-    Your AI-powered pet health companion is here!
-    
-    Before we get started, please tell me who you are:
-    
-    1️⃣ *Pet Parent* - I have a pet and need health guidance
-    2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
-    3️⃣ *Veterinarian* - I am a licensed vet professional
-    
-    👉 Please reply with *1*, *2*, or *3* to continue.`;
- 
-    return xmlReply(res, welcome);
-}
- 
+        const greetings = ["hi", "hello", "hey"];
+        if (greetings.some((g) => text.startsWith(g))) {
+            // Reset user so they can re-onboard
+            delete userRepo[fromNumber]; // Delete existing user before re-initializing
+            initUser(fromNumber);
+            userRepo[fromNumber].onboardingStep = "awaiting_role";
 
+            const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+    
+            Your AI-powered pet health companion is here!
+    
+            Before we get started, please tell me who you are:
+    
+            1️⃣ *Pet Parent* - I have a pet and need health guidance
+            2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
+            3️⃣ *Veterinarian* - I am a licensed vet professional
+    
+            👉 Please reply with *1*, *2*, or *3* to continue.`;
 
+            return xmlReply(res, welcome);
+        }
 
         // ================= ROLE SELECTION =================
         if (user.onboardingStep === "awaiting_role" && ["1", "2", "3"].includes(text)) {
@@ -278,93 +252,93 @@ Reply with *1*, *2*, or *3*.`
         }
 
         // =================================================================
-// ================= PET PARENT ONBOARDING FLOW ===================
-// =================================================================
+        // ================= PET PARENT ONBOARDING FLOW ===================
+        // =================================================================
 
-// STEP 1: Pet Name
-if (user.onboardingStep === "pet_awaiting_name") {
-    const petName = userMessage.trim();
+        // STEP 1: Pet Name
+        if (user.onboardingStep === "pet_awaiting_name") {
+            const petName = userMessage.trim();
 
-    // --- Validation ---
-    if (!petName || petName.length < 1) {
-        console.log("[STEP 1] Invalid pet name input:", petName);
-        return xmlReply(res,
-            `⚠️ Hmm, I didn't catch that!
+            // --- Validation ---
+            if (!petName || petName.length < 1) {
+                console.log("[STEP 1] Invalid pet name input:", petName);
+                return xmlReply(res,
+                    `⚠️ Hmm, I didn't catch that!
 
 Please tell me your pet's name. (e.g. *Bruno*, *Milo*, *Luna*)`
-        );
-    }
+                );
+            }
 
-    console.log("[STEP 1] Pet name received:", petName);
+            console.log("[STEP 1] Pet name received:", petName);
 
-    user.petInfo.name = petName;
-    user.onboardingStep = "pet_awaiting_age";
+            user.petInfo.name = petName;
+            user.onboardingStep = "pet_awaiting_age";
 
-    console.log("[STEP 1] Step updated to pet_awaiting_age for user:", user);
+            console.log("[STEP 1] Step updated to pet_awaiting_age for user:", user);
 
-    return xmlReply(res,
-        `🐾 *${petName}* — what a fantastic name! 🐾
+            return xmlReply(res,
+                `🐾 *${petName}* — what a fantastic name! 🐾
 
 How old is *${petName}*?
 (e.g. 2 years, 6 months)`
-    );
-}
+            );
+        }
 
-// STEP 2: Pet Age → Complete onboarding
-if (user.onboardingStep === "pet_awaiting_age") {
-    const petAge = userMessage.trim();
-    const petName = user.petInfo?.name;
+        // STEP 2: Pet Age → Complete onboarding
+        if (user.onboardingStep === "pet_awaiting_age") {
+            const petAge = userMessage.trim();
+            const petName = user.petInfo?.name;
 
-    console.log("[STEP 2] Entered pet_awaiting_age block");
-    console.log("[STEP 2] Raw userMessage:", userMessage);
-    console.log("[STEP 2] Trimmed petAge:", petAge);
-    console.log("[STEP 2] petName from user.petInfo:", petName);
+            console.log("[STEP 2] Entered pet_awaiting_age block");
+            console.log("[STEP 2] Raw userMessage:", userMessage);
+            console.log("[STEP 2] Trimmed petAge:", petAge);
+            console.log("[STEP 2] petName from user.petInfo:", petName);
 
-    // --- Guard: Check petName exists ---
-    if (!petName) {
-        console.log("[STEP 2] ERROR: petName is missing from user.petInfo");
-        return xmlReply(res,
-            `⚠️ Something went wrong. Let's start over.
+            // --- Guard: Check petName exists ---
+            if (!petName) {
+                console.log("[STEP 2] ERROR: petName is missing from user.petInfo");
+                return xmlReply(res,
+                    `⚠️ Something went wrong. Let's start over.
 
 🐶 *What's your pet's name?*`
-        );
-        user.onboardingStep = "pet_awaiting_name";
-    }
+                );
+                user.onboardingStep = "pet_awaiting_name";
+            }
 
-    // --- Validation: Check petAge is not empty ---
-    if (!petAge || petAge.length < 1) {
-        console.log("[STEP 2] Invalid age input - empty or null:", petAge);
-        return xmlReply(res,
-            `⚠️ I didn't catch that!
+            // --- Validation: Check petAge is not empty ---
+            if (!petAge || petAge.length < 1) {
+                console.log("[STEP 2] Invalid age input - empty or null:", petAge);
+                return xmlReply(res,
+                    `⚠️ I didn't catch that!
 
 How old is *${petName}*?
 (e.g. *2 years*, *6 months*)`
-        );
-    }
+                );
+            }
 
-    // --- Validation: Check petAge format ---
-    const agePattern = /^\d+\s*(years?|months?|weeks?)$/i;
-    if (!agePattern.test(petAge)) {
-        console.log("[STEP 2] Invalid age format:", petAge);
-        return xmlReply(res,
-            `⚠️ Please use a simple format like:
+            // --- Validation: Check petAge format ---
+            const agePattern = /^\d+\s*(years?|months?|weeks?)$/i;
+            if (!agePattern.test(petAge)) {
+                console.log("[STEP 2] Invalid age format:", petAge);
+                return xmlReply(res,
+                    `⚠️ Please use a simple format like:
 - *2 years*
 - *6 months*
 - *3 weeks*
 
 How old is *${petName}*?`
-        );
-    }
+                );
+            }
 
-    // --- All good, complete onboarding ---
-    user.petInfo.age = petAge;
-    user.onboardingStep = "complete";
+            // --- All good, complete onboarding ---
+            user.petInfo.age = petAge;
+            user.onboardingStep = "complete";
 
-    console.log("[STEP 2] Onboarding complete. petInfo:", user.petInfo);
-    console.log("[STEP 2] User state after completion:", user);
+            console.log("[STEP 2] Onboarding complete. petInfo:", user.petInfo);
+            console.log("[STEP 2] User state after completion:", user);
 
-    return xmlReply(res,
-        `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+            return xmlReply(res,
+                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
 
 I'm all set to help keep *${petName}* healthy and happy!
 
@@ -375,9 +349,8 @@ Here's what I can do:
 💊 Health & food advice
 
 👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!`
-    );
-}
-
+            );
+        }
 
         // =================================================================
         // ================= MAIN AI ANALYSIS (ALL ROLES) ==================
