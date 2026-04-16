@@ -98,7 +98,8 @@ app.post("/whatsapp", async (req, res) => {
     try {
         let userMessage = "Hi";
         let mediaUrl = null; // Define mediaUrl here
- 
+        let fromNumber = ""; // Initialize fromNumber here
+
         // 🔥 Extract message
         if (typeof req.body === "string") {
             const match = req.body.match(/Body=([^&]*)/);
@@ -110,15 +111,37 @@ app.post("/whatsapp", async (req, res) => {
             if (mediaMatch) {
                 mediaUrl = decodeURIComponent(mediaMatch[1].replace(/\+/g, " ")).trim();
             }
+            // Extract From number
+            const fromMatch = req.body.match(/From=([^&]*)/);
+            if (fromMatch) {
+                fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " "));
+            }
         } else if (req.body && req.body.Body) {
             userMessage = req.body.Body;
             if (req.body.MediaUrl0) {
                 mediaUrl = req.body.MediaUrl0;
             }
+            // Extract From number
+            if (req.body.From) {
+                fromNumber = req.body.From;
+            }
         }
- 
+
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
+
+        console.log("User Number:", fromNumber); // Debug log for the user's number
+        console.log("User Message:", userMessage); // Debug log for the user's message
+
+        // Continue with your existing logic...
+
+        res.status(200).send("Message processed");
+    } catch (error) {
+        console.error("Error processing the request:", error);
+        res.status(500).send("Internal Server Error");
+    }
+});
+
 
         // ================= USER REPO INIT =================
         let fromNumber = "";
@@ -184,21 +207,23 @@ if (greetings.some((g) => text.startsWith(g))) {
     delete userRepo[fromNumber]; // Delete existing user before re-initializing
     initUser(fromNumber);
     userRepo[fromNumber].onboardingStep = "awaiting_role";
-
+ 
     const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
-
+    
     Your AI-powered pet health companion is here!
-
+    
     Before we get started, please tell me who you are:
-
+    
     1️⃣ *Pet Parent* - I have a pet and need health guidance
     2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
     3️⃣ *Veterinarian* - I am a licensed vet professional
-
+    
     👉 Please reply with *1*, *2*, or *3* to continue.`;
-
+ 
     return xmlReply(res, welcome);
 }
+ 
+
 
 
         // ================= ROLE SELECTION =================
