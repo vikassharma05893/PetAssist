@@ -38,7 +38,6 @@ async function downloadImageAsBase64(url) {
             },
         });
 
-        // ✅ Detect actual image type (jpeg/png/webp)
         const contentType = response.headers["content-type"] || "image/jpeg";
         const base64 = Buffer.from(response.data, "binary").toString("base64");
 
@@ -50,7 +49,6 @@ async function downloadImageAsBase64(url) {
 }
 
 // ================= TYPING SIMULATION VIA TWILIO =================
-// Sends a "thinking" message to simulate typing, then the real reply follows
 async function sendTypingIndicator(toNumber, fromNumber) {
     try {
         await axios.post(
@@ -96,19 +94,23 @@ app.post("/whatsapp", async (req, res) => {
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
 
-        // Check for user ID and initialize user repository if not present
-        const fromNumber = req.body && req.body.From ? req.body.From : ""; // Extract from Twilio request
+        // ================= USER REPO INIT =================
+        const fromNumber = req.body && req.body.From ? req.body.From : "";
         if (!userRepo[fromNumber]) {
-            userRepo[fromNumber] = { interactionHistory: [], petInfo: {} }; // Initialize repo for new user
+            userRepo[fromNumber] = {
+                interactionHistory: [],
+                petInfo: {
+                    name: null,
+                    age: null,
+                    step: "idle", // Tracks onboarding step: idle | awaiting_name | awaiting_age | done
+                },
+            };
         }
 
-        const userId = fromNumber; // Assuming From number is a unique user ID
-
-        // Log the current inquiry
+        const userId = fromNumber;
         logQuery(userId, userMessage);
 
         // ================= MEDIA URL EXTRACTION =================
-        // ✅ MUST be before eye check so we know if image was sent
         let mediaUrl = null;
 
         if (typeof req.body === "string") {
@@ -117,18 +119,18 @@ app.post("/whatsapp", async (req, res) => {
                 mediaUrl = decodeURIComponent(mediaMatch[1]);
             }
         } else if (req.body) {
-            mediaUrl = req.body.MediaUrl0 || req.body.MediaUrl || null; // Added generic MediaUrl check
+            mediaUrl = req.body.MediaUrl0 || req.body.MediaUrl || null;
         }
 
         console.log("📸 Media URL:", mediaUrl);
 
-        // ✅ STEP 1: AI EYE CONTEXT DETECTION
+        // ================= EYE CHECK DETECTION =================
         const isEyeCheckFlow =
             text.includes("eye") ||
             text.includes("pupil") ||
             text.includes("vision");
 
-        // ================= EYE CHECK GUIDE (text only, no image sent yet) =================
+        // ================= EYE CHECK GUIDE (text only, no image) =================
         if (isEyeCheckFlow && !mediaUrl) {
             const eyeGuide = `👁️ *Advanced Eye Check*
 
@@ -160,25 +162,59 @@ Upload a clear close-up of both eyes in natural light (no flash)
             return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
         }
 
-        // ================= GREETING (no image) =================
+        // ================= GREETING → START ONBOARDING =================
         const greetings = ["hi", "hello", "hey"];
         if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-            const welcome = `🐾 *Hi! I'm PetAssist* 🐶🐱
 
-I'm your AI-powered pet health assistant!
+            // Reset onboarding so returning users can update pet info
+            userRepo[fromNumber].petInfo = { name: null, age: null, step: "awaiting_name" };
 
-Before we begin, could you please provide some details about your pet?
-1️⃣ *What is your pet's name?*
-2️⃣ *What is your pet's age?*
+            const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
-Once I have this information, I can assist you better!`;
+Your AI-powered pet health companion is here!
+
+Before we sniff out any health issues...
+🐶 *What's your furry friend's name?*`;
 
             res.set("Content-Type", "text/xml");
             return res.send(`<Response><Message>${welcome}</Message></Response>`);
         }
 
+        // ================= ONBOARDING STEP: AWAITING PET NAME =================
+        if (userRepo[fromNumber].petInfo.step === "awaiting_name" && !mediaUrl) {
+            const petName = userMessage.trim();
+            userRepo[fromNumber].petInfo.name = petName;
+            userRepo[fromNumber].petInfo.step = "awaiting_age";
+
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response><Message>🐾 *${petName}* — what a fantastic name! 🐾
+
+Now, how old is *${petName}*?
+(e.g. 2 years, 6 months)</Message></Response>`);
+        }
+
+        // ================= ONBOARDING STEP: AWAITING PET AGE =================
+        if (userRepo[fromNumber].petInfo.step === "awaiting_age" && !mediaUrl) {
+            const petAge = userMessage.trim();
+            const petName = userRepo[fromNumber].petInfo.name;
+            userRepo[fromNumber].petInfo.age = petAge;
+            userRepo[fromNumber].petInfo.step = "done";
+
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response><Message>🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+
+I'm all set to help you keep *${petName}* healthy and happy!
+
+Here's what I can do:
+🔍 Analyze symptoms (text or photo)
+👁️ Eye check & diagnosis
+🏥 Find nearby vets
+💊 Health & food advice
+
+👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!</Message></Response>`);
+        }
+
         // ================= FAST ACK (Typing Simulation via TwiML) =================
-        // This is sent immediately as the "typing indicator" effect on WhatsApp
         res.set("Content-Type", "text/xml");
         res.send(`<Response><Message>🐾 Got your message!
 ⏳ Analyzing now... please wait a moment.</Message></Response>`);
@@ -342,7 +378,6 @@ STRICT RULES:
                     }
                 );
 
-                // ✅ SINGLE declaration (FIXED)
                 let aiReply = response.data.choices[0].message.content;
 
                 // 🔥 LIMIT AI RESPONSE
@@ -350,7 +385,6 @@ STRICT RULES:
                     aiReply = aiReply.substring(0, 700) + "...";
                 }
 
-                // 🔥 BASE REPLY
                 let reply = aiReply;
 
                 // Update user interaction history
@@ -360,7 +394,7 @@ STRICT RULES:
                     aiReply,
                 });
 
-                // 🔥 CTA LOGIC (CLEAN)
+                // 🔥 CTA LOGIC
                 if (!isImageValid) {
                     reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I'll analyze it.";
                 } else {
@@ -376,12 +410,15 @@ STRICT RULES:
                     userMessage.trim().length > 3 &&
                     !["hi", "hello", "hey"].includes(text);
 
+                // Pet name for personalization (if available)
+                const petName = userRepo[userId]?.petInfo?.name || null;
+                const petLabel = petName ? ` for *${petName}*` : "";
+
                 // 🔥 FINAL FORMAT LOGIC
-                // ✅ IMAGE + TEXT FIRST MESSAGE → Greeting + Vets
                 if (isImageWithText && !isGreeting) {
                     reply = `🐾 *Hi! I'm PetAssist* 🐶🐱
 
-Here's what I found:
+Here's what I found${petLabel}:
 
 ${reply}
 
@@ -389,10 +426,8 @@ ${reply}
 🏥 *Nearby Vets:*
 ${vetList}
 ━━━━━━━━━━━━━━━`;
-                }
-                // ✅ TEXT ONLY → Analysis + Vets
-                else if (!isImageValid) {
-                    reply = `🐾 *PetAssist Analysis*
+                } else if (!isImageValid) {
+                    reply = `🐾 *PetAssist Analysis*${petLabel}
 
 ${reply}
 
@@ -400,10 +435,8 @@ ${reply}
 🏥 *Nearby Vets:*
 ${vetList}
 ━━━━━━━━━━━━━━━`;
-                }
-                // ✅ IMAGE ONLY → Analysis only
-                else {
-                    reply = `🐾 *PetAssist Analysis*
+                } else {
+                    reply = `🐾 *PetAssist Analysis*${petLabel}
 
 ${reply}`;
                 }
@@ -452,7 +485,7 @@ app.get("/", (req, res) => {
 
 // ================= USER INTERACTION HISTORY ENDPOINT =================
 app.get("/history", (req, res) => {
-    const userId = req.query.userId; // Expect userId to be passed as a query parameter
+    const userId = req.query.userId;
     if (userRepo[userId]) {
         res.json(userRepo[userId].interactionHistory);
     } else {
