@@ -8,6 +8,30 @@ const getNearbyVets = require("./vets");
 const app = express();
 const userRepo = {}; // In-memory user data repository
 
+// ================= HELPER: SEND TWILIO MESSAGE =================
+async function sendTwilioMessage(toNumber, body) {
+    await axios.post(
+        `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
+        new URLSearchParams({
+            From: "whatsapp:+14155238886",
+            To: toNumber.startsWith("whatsapp:") ? toNumber : `whatsapp:+${toNumber.replace(/^\+/, "")}`,
+            Body: body,
+        }),
+        {
+            auth: {
+                username: process.env.TWILIO_SID,
+                password: process.env.TWILIO_AUTH_TOKEN,
+            },
+        }
+    );
+}
+
+// ================= HELPER: XML RESPONSE =================
+function xmlReply(res, message) {
+    res.set("Content-Type", "text/xml");
+    return res.send(`<Response><Message>${message}</Message></Response>`);
+}
+
 // ================= ANALYZE IMAGE FROM URL (PRESERVED) =================
 async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, cost, food) {
     try {
@@ -19,7 +43,6 @@ async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, c
             cost,
             food,
         });
-
         return { reply, isImageValid };
     } catch (error) {
         console.error("Error analyzing the image:", error);
@@ -37,10 +60,8 @@ async function downloadImageAsBase64(url) {
                 password: process.env.TWILIO_AUTH_TOKEN,
             },
         });
-
         const contentType = response.headers["content-type"] || "image/jpeg";
         const base64 = Buffer.from(response.data, "binary").toString("base64");
-
         return `data:${contentType};base64,${base64}`;
     } catch (err) {
         console.log("❌ Image download error:", err.message);
@@ -71,6 +92,43 @@ async function sendTypingIndicator(toNumber, fromNumber) {
     }
 }
 
+// ================= INIT USER REPO =================
+function initUser(fromNumber) {
+    if (!userRepo[fromNumber]) {
+        userRepo[fromNumber] = {
+            role: null,               // pet_parent | rescuer | veterinarian
+            onboardingStep: "awaiting_role", // Global onboarding step tracker
+            interactionHistory: [],
+
+            // Pet Parent Info
+            petInfo: {
+                name: null,
+                age: null,
+            },
+
+            // Rescuer Info
+            rescuerInfo: {
+                name: null,
+                organizationName: null,
+                location: null,
+                contactNumber: null,
+                animalTypes: null,
+            },
+
+            // Veterinarian Info
+            vetInfo: {
+                name: null,
+                clinicName: null,
+                clinicAddress: null,
+                phone: null,
+                email: null,
+                specialization: null,
+                clinicHours: null,
+            },
+        };
+    }
+}
+
 // ================= TWILIO PARSING =================
 app.use(express.text({ type: "*/*" }));
 app.use(express.urlencoded({ extended: true }));
@@ -96,23 +154,14 @@ app.post("/whatsapp", async (req, res) => {
 
         // ================= USER REPO INIT =================
         const fromNumber = req.body && req.body.From ? req.body.From : "";
-        if (!userRepo[fromNumber]) {
-            userRepo[fromNumber] = {
-                interactionHistory: [],
-                petInfo: {
-                    name: null,
-                    age: null,
-                    step: "idle", // Tracks onboarding step: idle | awaiting_name | awaiting_age | done
-                },
-            };
-        }
+        initUser(fromNumber);
 
         const userId = fromNumber;
+        const user = userRepo[fromNumber];
         logQuery(userId, userMessage);
 
         // ================= MEDIA URL EXTRACTION =================
         let mediaUrl = null;
-
         if (typeof req.body === "string") {
             const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
             if (mediaMatch) {
@@ -121,7 +170,6 @@ app.post("/whatsapp", async (req, res) => {
         } else if (req.body) {
             mediaUrl = req.body.MediaUrl0 || req.body.MediaUrl || null;
         }
-
         console.log("📸 Media URL:", mediaUrl);
 
         // ================= EYE CHECK DETECTION =================
@@ -131,7 +179,7 @@ app.post("/whatsapp", async (req, res) => {
             text.includes("vision");
 
         // ================= EYE CHECK GUIDE (text only, no image) =================
-        if (isEyeCheckFlow && !mediaUrl) {
+        if (isEyeCheckFlow && !mediaUrl && user.onboardingStep === "complete") {
             const eyeGuide = `👁️ *Advanced Eye Check*
 
 1️⃣ *Share a picture of your pet's eyes:*
@@ -158,52 +206,111 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
 📤 Send the eye image when ready and I'll analyze it instantly!`;
 
-            res.set("Content-Type", "text/xml");
-            return res.send(`<Response><Message>${eyeGuide}</Message></Response>`);
+            return xmlReply(res, eyeGuide);
         }
 
-        // ================= GREETING → START ONBOARDING =================
+        // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
         if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-
-            // Reset onboarding so returning users can update pet info
-            userRepo[fromNumber].petInfo = { name: null, age: null, step: "awaiting_name" };
+            // Reset user so they can re-onboard
+            initUser(fromNumber);
+            userRepo[fromNumber].onboardingStep = "awaiting_role";
 
             const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
 Your AI-powered pet health companion is here!
 
-Before we sniff out any health issues...
-🐶 *What's your furry friend's name?*`;
+Before we get started, please tell me who you are:
 
-            res.set("Content-Type", "text/xml");
-            return res.send(`<Response><Message>${welcome}</Message></Response>`);
+1️⃣ *Pet Parent* - I have a pet and need health guidance
+2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
+3️⃣ *Veterinarian* - I am a licensed vet professional
+
+👉 Please reply with *1*, *2*, or *3* to continue.`;
+
+            return xmlReply(res, welcome);
         }
 
-        // ================= ONBOARDING STEP: AWAITING PET NAME =================
-        if (userRepo[fromNumber].petInfo.step === "awaiting_name" && !mediaUrl) {
+        // ================= ROLE SELECTION =================
+        if (user.onboardingStep === "awaiting_role" && ["1", "2", "3"].includes(text)) {
+            if (text === "1") {
+                user.role = "pet_parent";
+                user.onboardingStep = "pet_awaiting_name";
+                return xmlReply(res,
+                    `🐾 *Welcome, Pet Parent!* 🐶🐱
+
+I'm so excited to help keep your furry friend healthy!
+
+First things first...
+🐶 *What's your pet's name?*`
+                );
+            } else if (text === "2") {
+                user.role = "rescuer";
+                user.onboardingStep = "rescuer_awaiting_name";
+                return xmlReply(res,
+                    `🦺 *Welcome, Animal Rescuer!* 🐕🐈
+
+Thank you for the amazing work you do for animals!
+
+Let's get you set up.
+👤 *What is your name?*`
+                );
+            } else if (text === "3") {
+                user.role = "veterinarian";
+                user.onboardingStep = "vet_awaiting_name";
+                return xmlReply(res,
+                    `🏥 *Welcome, Veterinarian!* 🩺
+
+Great to have a medical professional on board!
+
+Let's build your profile.
+👤 *What is your full name?*`
+                );
+            }
+        }
+
+        // ================= INVALID ROLE INPUT =================
+        if (user.onboardingStep === "awaiting_role" && !["1", "2", "3"].includes(text)) {
+            return xmlReply(res,
+                `⚠️ Please select a valid option:
+
+1️⃣ *Pet Parent*
+2️⃣ *Animal Rescuer*
+3️⃣ *Veterinarian*
+
+Reply with *1*, *2*, or *3*.`
+            );
+        }
+
+        // =================================================================
+        // ================= PET PARENT ONBOARDING FLOW ===================
+        // =================================================================
+
+        // STEP 1: Pet Name
+        if (user.onboardingStep === "pet_awaiting_name" && !mediaUrl) {
             const petName = userMessage.trim();
-            userRepo[fromNumber].petInfo.name = petName;
-            userRepo[fromNumber].petInfo.step = "awaiting_age";
+            user.petInfo.name = petName;
+            user.onboardingStep = "pet_awaiting_age";
 
-            res.set("Content-Type", "text/xml");
-            return res.send(`<Response><Message>🐾 *${petName}* — what a fantastic name! 🐾
+            return xmlReply(res,
+                `🐾 *${petName}* — what a fantastic name! 🐾
 
-Now, how old is *${petName}*?
-(e.g. 2 years, 6 months)</Message></Response>`);
+How old is *${petName}*?
+(e.g. 2 years, 6 months)`
+            );
         }
 
-        // ================= ONBOARDING STEP: AWAITING PET AGE =================
-        if (userRepo[fromNumber].petInfo.step === "awaiting_age" && !mediaUrl) {
+        // STEP 2: Pet Age → Complete onboarding
+        if (user.onboardingStep === "pet_awaiting_age" && !mediaUrl) {
             const petAge = userMessage.trim();
-            const petName = userRepo[fromNumber].petInfo.name;
-            userRepo[fromNumber].petInfo.age = petAge;
-            userRepo[fromNumber].petInfo.step = "done";
+            const petName = user.petInfo.name;
+            user.petInfo.age = petAge;
+            user.onboardingStep = "complete";
 
-            res.set("Content-Type", "text/xml");
-            return res.send(`<Response><Message>🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+            return xmlReply(res,
+                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
 
-I'm all set to help you keep *${petName}* healthy and happy!
+I'm all set to help keep *${petName}* healthy and happy!
 
 Here's what I can do:
 🔍 Analyze symptoms (text or photo)
@@ -211,10 +318,191 @@ Here's what I can do:
 🏥 Find nearby vets
 💊 Health & food advice
 
-👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!</Message></Response>`);
+👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!`
+            );
         }
 
-        // ================= FAST ACK (Typing Simulation via TwiML) =================
+        // =================================================================
+        // ================= ANIMAL RESCUER ONBOARDING FLOW ===============
+        // =================================================================
+
+        // STEP 1: Rescuer Name
+        if (user.onboardingStep === "rescuer_awaiting_name" && !mediaUrl) {
+            user.rescuerInfo.name = userMessage.trim();
+            user.onboardingStep = "rescuer_awaiting_org";
+
+            return xmlReply(res,
+                `👋 Nice to meet you, *${user.rescuerInfo.name}*!
+
+🏢 What is the name of your *rescue organization*?
+(If independent, reply "Independent")`
+            );
+        }
+
+        // STEP 2: Organization Name
+        if (user.onboardingStep === "rescuer_awaiting_org" && !mediaUrl) {
+            user.rescuerInfo.organizationName = userMessage.trim();
+            user.onboardingStep = "rescuer_awaiting_location";
+
+            return xmlReply(res,
+                `Got it! 📍 What *city or area* do you operate in?`
+            );
+        }
+
+        // STEP 3: Location
+        if (user.onboardingStep === "rescuer_awaiting_location" && !mediaUrl) {
+            user.rescuerInfo.location = userMessage.trim();
+            user.onboardingStep = "rescuer_awaiting_contact";
+
+            return xmlReply(res,
+                `📞 Please provide your *contact number* for coordination.`
+            );
+        }
+
+        // STEP 4: Contact Number
+        if (user.onboardingStep === "rescuer_awaiting_contact" && !mediaUrl) {
+            user.rescuerInfo.contactNumber = userMessage.trim();
+            user.onboardingStep = "rescuer_awaiting_animal_types";
+
+            return xmlReply(res,
+                `🐾 What *types of animals* do you typically rescue?
+(e.g. Dogs, Cats, Birds, Wild Animals, All)`
+            );
+        }
+
+        // STEP 5: Animal Types → Complete onboarding
+        if (user.onboardingStep === "rescuer_awaiting_animal_types" && !mediaUrl) {
+            user.rescuerInfo.animalTypes = userMessage.trim();
+            user.onboardingStep = "complete";
+
+            return xmlReply(res,
+                `🦺 *Profile Complete, ${user.rescuerInfo.name}!* 🐾
+
+Here's a summary of your profile:
+👤 Name: ${user.rescuerInfo.name}
+🏢 Organization: ${user.rescuerInfo.organizationName}
+📍 Location: ${user.rescuerInfo.location}
+📞 Contact: ${user.rescuerInfo.contactNumber}
+🐾 Animals: ${user.rescuerInfo.animalTypes}
+
+Here's how I can help you:
+🔍 Analyze injured/sick animal photos
+🏥 Find nearby emergency vets
+💊 First-aid guidance for rescued animals
+👁️ Eye & wound assessment
+
+👉 Send a photo or describe the animal's condition to get started!`
+            );
+        }
+
+        // =================================================================
+        // ================= VETERINARIAN ONBOARDING FLOW =================
+        // =================================================================
+
+        // STEP 1: Vet Name
+        if (user.onboardingStep === "vet_awaiting_name" && !mediaUrl) {
+            user.vetInfo.name = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_clinic_name";
+
+            return xmlReply(res,
+                `🩺 Welcome, Dr. *${user.vetInfo.name}*!
+
+🏥 What is the name of your *clinic or hospital*?`
+            );
+        }
+
+        // STEP 2: Clinic Name
+        if (user.onboardingStep === "vet_awaiting_clinic_name" && !mediaUrl) {
+            user.vetInfo.clinicName = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_clinic_address";
+
+            return xmlReply(res,
+                `📍 What is your *clinic's address*?`
+            );
+        }
+
+        // STEP 3: Clinic Address
+        if (user.onboardingStep === "vet_awaiting_clinic_address" && !mediaUrl) {
+            user.vetInfo.clinicAddress = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_phone";
+
+            return xmlReply(res,
+                `📞 Please provide your *clinic's phone number*.`
+            );
+        }
+
+        // STEP 4: Phone
+        if (user.onboardingStep === "vet_awaiting_phone" && !mediaUrl) {
+            user.vetInfo.phone = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_email";
+
+            return xmlReply(res,
+                `📧 Please provide your *professional email address*.`
+            );
+        }
+
+        // STEP 5: Email
+        if (user.onboardingStep === "vet_awaiting_email" && !mediaUrl) {
+            user.vetInfo.email = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_specialization";
+
+            return xmlReply(res,
+                `🔬 What is your *area of specialization*?
+(e.g. General Practice, Surgery, Dermatology, Oncology)`
+            );
+        }
+
+        // STEP 6: Specialization
+        if (user.onboardingStep === "vet_awaiting_specialization" && !mediaUrl) {
+            user.vetInfo.specialization = userMessage.trim();
+            user.onboardingStep = "vet_awaiting_clinic_hours";
+
+            return xmlReply(res,
+                `🕐 What are your *clinic operating hours*?
+(e.g. Mon-Fri 9am-6pm, Sat 9am-1pm)`
+            );
+        }
+
+        // STEP 7: Clinic Hours → Complete onboarding
+        if (user.onboardingStep === "vet_awaiting_clinic_hours" && !mediaUrl) {
+            user.vetInfo.clinicHours = userMessage.trim();
+            user.onboardingStep = "complete";
+
+            return xmlReply(res,
+                `🏥 *Profile Complete, Dr. ${user.vetInfo.name}!* 🩺
+
+Here's a summary of your profile:
+👤 Name: Dr. ${user.vetInfo.name}
+🏥 Clinic: ${user.vetInfo.clinicName}
+📍 Address: ${user.vetInfo.clinicAddress}
+📞 Phone: ${user.vetInfo.phone}
+📧 Email: ${user.vetInfo.email}
+🔬 Specialization: ${user.vetInfo.specialization}
+🕐 Hours: ${user.vetInfo.clinicHours}
+
+Here's how I can assist you:
+🔍 AI-assisted symptom & image analysis
+📋 Patient case management
+👁️ Eye & wound diagnostics
+💊 Drug & treatment reference
+
+👉 Send a patient's photo or describe their symptoms to begin!`
+            );
+        }
+
+        // =================================================================
+        // ================= MAIN AI ANALYSIS (ALL ROLES) ==================
+        // =================================================================
+
+        // Only proceed to AI analysis if onboarding is complete
+        if (user.onboardingStep !== "complete") {
+            return xmlReply(res,
+                `⚠️ Please complete your profile setup first to continue.
+Reply *Hi* to start over.`
+            );
+        }
+
+        // ================= FAST ACK =================
         res.set("Content-Type", "text/xml");
         res.send(`<Response><Message>🐾 Got your message!
 ⏳ Analyzing now... please wait a moment.</Message></Response>`);
@@ -257,13 +545,18 @@ Here's what I can do:
                             },
                             {
                                 type: "image_url",
-                                image_url: {
-                                    url: base64Image,
-                                },
+                                image_url: { url: base64Image },
                             },
                         ];
                     }
                 }
+
+                // ================= ROLE-BASED SYSTEM PROMPT =================
+                const roleContext = user.role === "veterinarian"
+                    ? `The user is a licensed veterinarian (Dr. ${user.vetInfo.name}, specializing in ${user.vetInfo.specialization}). Use technical/clinical language.`
+                    : user.role === "rescuer"
+                    ? `The user is an animal rescuer (${user.rescuerInfo.name}, ${user.rescuerInfo.organizationName}). Focus on first-aid, triage, and emergency guidance.`
+                    : `The user is a pet parent. Their pet's name is ${user.petInfo?.name || "unknown"}, age ${user.petInfo?.age || "unknown"}. Use simple, friendly language.`;
 
                 // ================= OPENAI API CALL =================
                 const response = await axios.post(
@@ -276,6 +569,7 @@ Here's what I can do:
                                 content: isEyeCheckFlow && isImageValid
                                     ? `
 You are a veterinary eye specialist.
+${roleContext}
 
 Analyze pet eye images carefully and logically.
 
@@ -317,6 +611,7 @@ Rules:
 `
                                     : `
 You are a smart pet health assistant.
+${roleContext}
 
 Give SHORT, clear, WhatsApp-friendly responses.
 
@@ -327,20 +622,11 @@ If the user sends an image:
 
 STEP 1: Describe what you SEE in the image clearly
 - color, texture, shape, abnormal signs
-- be specific (e.g. "yellow loose stool", "watery texture", "mucus visible")
 
 STEP 2: Explain what it INDICATES
 - connect visual signs to possible conditions
 
 STEP 3: Give practical next steps
-
-IMPORTANT:
-- Do NOT jump directly to diagnosis
-- Always explain reasoning from image → problem
-- If unclear, say what is unclear
-
-If the user sends BOTH text + image:
-- Combine both inputs
 
 STRICT RULES:
 - Max 8–10 lines
@@ -387,38 +673,41 @@ STRICT RULES:
 
                 let reply = aiReply;
 
-                // Update user interaction history
-                userRepo[userId].interactionHistory.push({
+                // Update interaction history
+                user.interactionHistory.push({
                     timestamp: new Date(),
                     userMessage,
                     aiReply,
+                    role: user.role,
                 });
 
                 // 🔥 CTA LOGIC
                 if (!isImageValid) {
-                    reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo of your pet and I'll analyze it.";
+                    reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo and I'll analyze it instantly.";
                 } else {
-                    reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of your pet's eyes.";
+                    reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of the eyes.";
                 }
 
-                // 🔥 DETECT GREETING
-                const isGreeting = text.startsWith("hi") || text.startsWith("hello") || text.startsWith("hey");
+                // 🔥 PERSONALIZED LABEL BASED ON ROLE
+                let subjectLabel = "";
+                if (user.role === "pet_parent" && user.petInfo?.name) {
+                    subjectLabel = ` for *${user.petInfo.name}*`;
+                } else if (user.role === "rescuer") {
+                    subjectLabel = ` | *Rescue Case*`;
+                } else if (user.role === "veterinarian") {
+                    subjectLabel = ` | *Clinical Analysis*`;
+                }
 
                 // 🔥 DETECT IMAGE + TEXT
+                const isGreeting = text.startsWith("hi") || text.startsWith("hello") || text.startsWith("hey");
                 const isImageWithText = isImageValid &&
                     userMessage &&
                     userMessage.trim().length > 3 &&
                     !["hi", "hello", "hey"].includes(text);
 
-                // Pet name for personalization (if available)
-                const petName = userRepo[userId]?.petInfo?.name || null;
-                const petLabel = petName ? ` for *${petName}*` : "";
-
                 // 🔥 FINAL FORMAT LOGIC
                 if (isImageWithText && !isGreeting) {
-                    reply = `🐾 *Hi! I'm PetAssist* 🐶🐱
-
-Here's what I found${petLabel}:
+                    reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
 ${reply}
 
@@ -427,7 +716,7 @@ ${reply}
 ${vetList}
 ━━━━━━━━━━━━━━━`;
                 } else if (!isImageValid) {
-                    reply = `🐾 *PetAssist Analysis*${petLabel}
+                    reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
 ${reply}
 
@@ -436,7 +725,7 @@ ${reply}
 ${vetList}
 ━━━━━━━━━━━━━━━`;
                 } else {
-                    reply = `🐾 *PetAssist Analysis*${petLabel}
+                    reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
 ${reply}`;
                 }
@@ -447,23 +736,10 @@ ${reply}`;
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
 
-                // ================= SEND FINAL REPLY VIA TWILIO =================
-                await axios.post(
-                    `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
-                    new URLSearchParams({
-                        From: "whatsapp:+14155238886",
-                        To: fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:+${fromNumber.replace(/^\+/, "")}`,
-                        Body: reply,
-                    }),
-                    {
-                        auth: {
-                            username: process.env.TWILIO_SID,
-                            password: process.env.TWILIO_AUTH_TOKEN,
-                        },
-                    }
-                );
-
+                // ================= SEND FINAL REPLY =================
+                await sendTwilioMessage(fromNumber, reply);
                 console.log("✅ Reply sent successfully");
+
             } catch (err) {
                 console.log("❌ Background error:", err.response?.data || err.message);
             }
@@ -488,6 +764,22 @@ app.get("/history", (req, res) => {
     const userId = req.query.userId;
     if (userRepo[userId]) {
         res.json(userRepo[userId].interactionHistory);
+    } else {
+        res.status(404).json({ message: "User not found" });
+    }
+});
+
+// ================= USER PROFILE ENDPOINT =================
+app.get("/profile", (req, res) => {
+    const userId = req.query.userId;
+    if (userRepo[userId]) {
+        const user = userRepo[userId];
+        res.json({
+            role: user.role,
+            petInfo: user.role === "pet_parent" ? user.petInfo : undefined,
+            rescuerInfo: user.role === "rescuer" ? user.rescuerInfo : undefined,
+            vetInfo: user.role === "veterinarian" ? user.vetInfo : undefined,
+        });
     } else {
         res.status(404).json({ message: "User not found" });
     }
