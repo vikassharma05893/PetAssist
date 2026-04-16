@@ -26,6 +26,25 @@ async function sendTwilioMessage(toNumber, body) {
     );
 }
 
+// ================= HELPER: DOWNLOAD IMAGE AS BASE64 =================
+async function downloadImageAsBase64(url) {
+    try {
+        const response = await axios.get(url, {
+            responseType: "arraybuffer",
+            auth: {
+                username: process.env.TWILIO_SID,
+                password: process.env.TWILIO_AUTH_TOKEN,
+            },
+        });
+        const base64 = Buffer.from(response.data).toString("base64");
+        const mimeType = response.headers["content-type"] || "image/jpeg";
+        return `data:${mimeType};base64,${base64}`;
+    } catch (err) {
+        console.log("Image download error:", err.message);
+        return null;
+    }
+}
+
 // ================= HELPER: XML RESPONSE =================
 function xmlReply(res, message) {
     res.set("Content-Type", "text/xml");
@@ -78,17 +97,26 @@ app.use(express.json());
 app.post("/whatsapp", async (req, res) => {
     try {
         let userMessage = "Hi";
-
+        let mediaUrl = null; // Define mediaUrl here
+ 
         // 🔥 Extract message
         if (typeof req.body === "string") {
             const match = req.body.match(/Body=([^&]*)/);
             if (match) {
                 userMessage = decodeURIComponent(match[1].replace(/\+/g, " "));
             }
+            // Extract MediaUrl0
+            const mediaMatch = req.body.match(/MediaUrl0=([^&]*)/);
+            if (mediaMatch) {
+                mediaUrl = decodeURIComponent(mediaMatch[1].replace(/\+/g, " ")).trim();
+            }
         } else if (req.body && req.body.Body) {
             userMessage = req.body.Body;
+            if (req.body.MediaUrl0) {
+                mediaUrl = req.body.MediaUrl0;
+            }
         }
-
+ 
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
 
@@ -150,26 +178,28 @@ Upload a clear close-up of both eyes in natural light (no flash)
         }
 
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
-        const greetings = ["hi", "hello", "hey"];
-        if (greetings.some((g) => text.startsWith(g))) {
-            // Reset user so they can re-onboard
-            initUser(fromNumber);
-            userRepo[fromNumber].onboardingStep = "awaiting_role";
+const greetings = ["hi", "hello", "hey"];
+if (greetings.some((g) => text.startsWith(g))) {
+    // Reset user so they can re-onboard
+    delete userRepo[fromNumber]; // Delete existing user before re-initializing
+    initUser(fromNumber);
+    userRepo[fromNumber].onboardingStep = "awaiting_role";
 
-            const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+    const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
-Your AI-powered pet health companion is here!
+    Your AI-powered pet health companion is here!
 
-Before we get started, please tell me who you are:
+    Before we get started, please tell me who you are:
 
-1️⃣ *Pet Parent* - I have a pet and need health guidance
-2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
-3️⃣ *Veterinarian* - I am a licensed vet professional
+    1️⃣ *Pet Parent* - I have a pet and need health guidance
+    2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
+    3️⃣ *Veterinarian* - I am a licensed vet professional
 
-👉 Please reply with *1*, *2*, or *3* to continue.`;
+    👉 Please reply with *1*, *2*, or *3* to continue.`;
 
-            return xmlReply(res, welcome);
-        }
+    return xmlReply(res, welcome);
+}
+
 
         // ================= ROLE SELECTION =================
         if (user.onboardingStep === "awaiting_role" && ["1", "2", "3"].includes(text)) {
