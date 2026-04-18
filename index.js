@@ -302,25 +302,26 @@ How old is *${petName}*?
 
         // STEP 2: Pet Age → Complete onboarding
         if (user.onboardingStep === "pet_awaiting_age" && !mediaUrl) {
-            const petAge = userMessage.trim();
-            const petName = user.petInfo.name;
-            user.petInfo.age = petAge;
-            user.onboardingStep = "complete";
+    const petAge = userMessage.trim();
+    const petName = user.petInfo.name;
+    user.petInfo.age = petAge;
+    user.onboardingStep = "complete";
 
-            return xmlReply(res,
-                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶💛
+    return xmlReply(res,
+        `✅ *Profile Complete!*
 
-I'm all set to help keep *${petName}* healthy and happy!
+🐾 Pet: *${petName}* | Age: *${petAge}*
 
-Here's what I can do:
-🔍 Analyze symptoms (text or photo)
-👁️ Eye check & diagnosis
-🏥 Find nearby vets
-💊 Health & food advice
+Welcome aboard, Pet Parent! I'm ready to assist *${petName}*. 🐶💛
 
-👉 Tell me what's bothering *${petName}*, or send a photo for instant analysis!`
-            );
-        }
+What's bothering *${petName}* today?
+You can:
+📝 Describe the symptoms in text
+📸 Send a photo for instant visual analysis
+👁️ Type *eye check* for an eye diagnosis
+🏥 Type *find vet* to locate nearby vets`
+    );
+}
 
         // =================================================================
         // ================= ANIMAL RESCUER ONBOARDING FLOW ===============
@@ -372,28 +373,24 @@ Here's what I can do:
 
         // STEP 5: Animal Types → Complete onboarding
         if (user.onboardingStep === "rescuer_awaiting_animal_types" && !mediaUrl) {
-            user.rescuerInfo.animalTypes = userMessage.trim();
-            user.onboardingStep = "complete";
+    user.rescuerInfo.animalTypes = userMessage.trim();
+    user.onboardingStep = "complete";
 
-            return xmlReply(res,
-                `🦺 *Profile Complete, ${user.rescuerInfo.name}!* 🐾
+    return xmlReply(res,
+        `✅ *Profile Complete, ${user.rescuerInfo.name}!*
 
-Here's a summary of your profile:
-👤 Name: ${user.rescuerInfo.name}
-🏢 Organization: ${user.rescuerInfo.organizationName}
-📍 Location: ${user.rescuerInfo.location}
-📞 Contact: ${user.rescuerInfo.contactNumber}
-🐾 Animals: ${user.rescuerInfo.animalTypes}
+👤 ${user.rescuerInfo.name} | 🏢 ${user.rescuerInfo.organizationName}
+📍 ${user.rescuerInfo.location} | 🐾 ${user.rescuerInfo.animalTypes}
 
-Here's how I can help you:
-🔍 Analyze injured/sick animal photos
-🏥 Find nearby emergency vets
-💊 First-aid guidance for rescued animals
-👁️ Eye & wound assessment
+You're all set! Do you have an animal that needs help right now?
 
-👉 Send a photo or describe the animal's condition to get started!`
-            );
-        }
+Tell me about your current rescue case:
+📝 Describe the animal's condition or injuries
+📸 Send a photo for instant triage analysis
+👁️ Type *eye check* for eye/wound assessment
+🏥 Type *find vet* to locate nearest emergency vet`
+    );
+}
 
         // =================================================================
         // ================= VETERINARIAN ONBOARDING FLOW =================
@@ -465,30 +462,24 @@ Here's how I can help you:
 
         // STEP 7: Clinic Hours → Complete onboarding
         if (user.onboardingStep === "vet_awaiting_clinic_hours" && !mediaUrl) {
-            user.vetInfo.clinicHours = userMessage.trim();
-            user.onboardingStep = "complete";
+    user.vetInfo.clinicHours = userMessage.trim();
+    user.onboardingStep = "complete";
 
-            return xmlReply(res,
-                `🏥 *Profile Complete, Dr. ${user.vetInfo.name}!* 🩺
+    return xmlReply(res,
+        `✅ *Profile Complete, Dr. ${user.vetInfo.name}!*
 
-Here's a summary of your profile:
-👤 Name: Dr. ${user.vetInfo.name}
-🏥 Clinic: ${user.vetInfo.clinicName}
-📍 Address: ${user.vetInfo.clinicAddress}
-📞 Phone: ${user.vetInfo.phone}
-📧 Email: ${user.vetInfo.email}
-🔬 Specialization: ${user.vetInfo.specialization}
-🕐 Hours: ${user.vetInfo.clinicHours}
+🏥 ${user.vetInfo.clinicName} | 🔬 ${user.vetInfo.specialization}
+📍 ${user.vetInfo.clinicAddress} | 🕐 ${user.vetInfo.clinicHours}
 
-Here's how I can assist you:
-🔍 AI-assisted symptom & image analysis
-📋 Patient case management
-👁️ Eye & wound diagnostics
-💊 Drug & treatment reference
+Ready to assist with your clinical cases, Doctor.
 
-👉 Send a patient's photo or describe their symptoms to begin!`
-            );
-        }
+What would you like to analyze today?
+📝 Describe a patient's symptoms for differential diagnosis
+📸 Send a patient photo for AI-assisted visual analysis
+👁️ Type *eye check* for ophthalmic case assessment
+💊 Ask about drug dosages or treatment protocols`
+    );
+}
 
         // =================================================================
         // ================= MAIN AI ANALYSIS (ALL ROLES) ==================
