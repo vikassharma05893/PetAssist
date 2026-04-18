@@ -239,9 +239,27 @@ if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
     initUser(fromNumber);
     const user = userRepo[fromNumber];
 
-    // Restore session if user already existed
+    // Restore session only if user existed AND onboarding was complete
     if (existingUser && existingUser.onboardingStep === "complete") {
         userRepo[fromNumber] = existingUser;
+        user.lastActiveAt = Date.now();
+    }
+
+    // Fresh user after exit — go straight to onboarding
+    if (!existingUser) {
+        return xmlReply(res,
+            `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+
+Your AI-powered pet health companion is here!
+
+Before we get started, please tell me who you are:
+
+1️⃣ *Pet Parent* - I have a pet and need health guidance
+2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
+3️⃣ *Veterinarian* - I am a licensed vet professional
+
+👉 Please reply with *1*, *2*, or *3* to continue.`
+        );
     }
 
     // Check idle timeout — 60 seconds
