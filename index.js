@@ -183,8 +183,6 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
             );
         }
 
-        initUser(fromNumber);
-
         const userId = fromNumber;
         let user = userRepo[fromNumber];
         logQuery(userId, userMessage);
