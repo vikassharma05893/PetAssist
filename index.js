@@ -818,8 +818,8 @@ STRICT RULES:
                 let aiReply = response.data.choices[0].message.content;
 
                 // 🔥 LIMIT AI RESPONSE
-                if (isImageValid && aiReply.length > 1500) {
-    aiReply = aiReply.substring(0, 1500) + "...";
+                if (isImageValid && aiReply.length > 1400) {
+    aiReply = aiReply.substring(0, 1400) + "...";
 } else if (!isImageValid && aiReply.length > 700) {
     aiReply = aiReply.substring(0, 700) + "...";
 }
