@@ -184,6 +184,7 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
         }
 
         const userId = fromNumber;
+        initUser(fromNumber);
         let user = userRepo[fromNumber];
         logQuery(userId, userMessage);
 
@@ -240,7 +241,7 @@ Upload a clear close-up of both eyes in natural light (no flash)
         const greetings = ["hi", "hello", "hey"];
 if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
     const existingUser = userRepo[fromNumber] && userRepo[fromNumber].onboardingStep !== "awaiting_role"
-        ? userRepo[fromNumber]
+        ? { ...userRepo[fromNumber] }
         : null;
 
     initUser(fromNumber);
