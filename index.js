@@ -153,7 +153,15 @@ app.post("/whatsapp", async (req, res) => {
         const text = userMessage.toLowerCase();
 
         // ================= USER REPO INIT =================
-        const fromNumber = req.body && req.body.From ? req.body.From : "";
+        let fromNumber = "";
+if (typeof req.body === "string") {
+    const fromMatch = req.body.match(/From=([^&]*)/);
+    if (fromMatch) {
+        fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " ")).trim();
+    }
+} else if (req.body && req.body.From) {
+    fromNumber = req.body.From;
+}
         initUser(fromNumber);
 
         const userId = fromNumber;
