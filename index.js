@@ -164,7 +164,7 @@ app.post("/whatsapp", async (req, res) => {
         if (typeof req.body === "string") {
             const fromMatch = req.body.match(/From=([^&]*)/);
             if (fromMatch) {
-                fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " ")).trim();
+                fromNumber = decodeURIComponent(fromMatch[1]).trim();
             }
         } else if (req.body && req.body.From) {
             fromNumber = req.body.From;
@@ -246,23 +246,26 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
-if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-    const existingUser = preExistingUser && preExistingUser.onboardingStep !== "awaiting_role"
-        ? preExistingUser
-        : null;
+        if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
+            const preExistingUser = userRepo[fromNumber] && userRepo[fromNumber].onboardingStep !== "awaiting_role"
+                ? { ...userRepo[fromNumber] }
+                : null;
 
-    // Restore session only if user existed AND onboarding was complete
-    if (existingUser && existingUser.onboardingStep === "complete") {
-        userRepo[fromNumber] = existingUser;
-        userRepo[fromNumber].lastActiveAt = Date.now();
-    }
+            initUser(fromNumber);
 
-    user = userRepo[fromNumber];
+            if (preExistingUser && preExistingUser.onboardingStep === "complete") {
+                userRepo[fromNumber] = preExistingUser;
+                userRepo[fromNumber].lastActiveAt = Date.now();
+            }
 
-    // Fresh user after exit — go straight to onboarding
-    if (!existingUser) {
-        return xmlReply(res,
-            `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+            user = userRepo[fromNumber];
+
+            // Fresh user — show welcome
+            if (!preExistingUser) {
+                user.onboardingStep = "awaiting_role";
+                user.lastActiveAt = Date.now();
+                return xmlReply(res,
+                    `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
 Your AI-powered pet health companion is here!
 
@@ -273,66 +276,66 @@ Before we get started, please tell me who you are:
 3️⃣ *Veterinarian* - I am a licensed vet professional
 
 👉 Please reply with *1*, *2*, or *3* to continue.`
-        );
-    }
+                );
+            }
 
-    // Check idle timeout — 60 seconds
-    const now = Date.now();
-    const isIdle = user.lastActiveAt && (now - user.lastActiveAt) > 60 * 1000;
+            // Check idle timeout — 60 seconds
+            const now = Date.now();
+            const isIdle = user.lastActiveAt && (now - user.lastActiveAt) > 60 * 1000;
 
-    // Returning user — onboarding already complete
-    if (user.onboardingStep === "complete") {
-        user.lastActiveAt = now;
+            // Returning user — onboarding already complete
+            if (user.onboardingStep === "complete") {
+                user.lastActiveAt = now;
 
-        if (user.role === "pet_parent") {
-            return xmlReply(res,
-                `🐾 Welcome back, Pet Parent! How is *${user.petInfo.name}* doing today?
+                if (user.role === "pet_parent") {
+                    return xmlReply(res,
+                        `🐾 Welcome back, Pet Parent! How is *${user.petInfo.name}* doing today?
 
 Describe the symptoms or send a photo to get started!`
-            );
-        }
+                    );
+                }
 
-        if (user.role === "rescuer") {
-            user.sessionState = "rescuer_returning";
-            return xmlReply(res,
-                `🦺 Welcome back, *${user.rescuerInfo.name}*!
+                if (user.role === "rescuer") {
+                    user.sessionState = "rescuer_returning";
+                    return xmlReply(res,
+                        `🦺 Welcome back, *${user.rescuerInfo.name}*!
 
 What would you like to do?
 1️⃣ New rescue case
 2️⃣ View earlier rescue history`
-            );
-        }
+                    );
+                }
 
-        if (user.role === "veterinarian") {
-            user.sessionState = "vet_returning";
-            return xmlReply(res,
-                `🏥 Welcome back, Dr. *${user.vetInfo.name}*!
+                if (user.role === "veterinarian") {
+                    user.sessionState = "vet_returning";
+                    return xmlReply(res,
+                        `🏥 Welcome back, Dr. *${user.vetInfo.name}*!
 
 What would you like to do?
 1️⃣ Start a new patient case
 2️⃣ Review an earlier case file`
-            );
-        }
-    }
+                    );
+                }
+            }
 
-    // Idle timeout — session expired, ask to continue or restart
-    if (isIdle) {
-        user.sessionState = "idle_prompt";
-        user.lastActiveAt = now;
-        return xmlReply(res,
-            `⏳ Your session was idle for a while.
+            // Idle timeout — session expired
+            if (isIdle) {
+                user.sessionState = "idle_prompt";
+                user.lastActiveAt = now;
+                return xmlReply(res,
+                    `⏳ Your session was idle for a while.
 
 Would you like to:
 1️⃣ Continue where you left off
 2️⃣ Start fresh`
-        );
-    }
+                );
+            }
 
-    // New user — full onboarding
-    user.onboardingStep = "awaiting_role";
-    user.lastActiveAt = now;
-    return xmlReply(res,
-        `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+            // Fallback — full onboarding
+            user.onboardingStep = "awaiting_role";
+            user.lastActiveAt = now;
+            return xmlReply(res,
+                `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
 Your AI-powered pet health companion is here!
 
@@ -343,8 +346,8 @@ Before we get started, please tell me who you are:
 3️⃣ *Veterinarian* - I am a licensed vet professional
 
 👉 Please reply with *1*, *2*, or *3* to continue.`
-    );
-}
+            );
+        }
 
         // ================= IDLE PROMPT HANDLER =================
         if (user.sessionState === "idle_prompt" && ["1", "2"].includes(text)) {
