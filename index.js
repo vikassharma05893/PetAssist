@@ -732,7 +732,45 @@ Rules:
 - No guessing
 - No generic answers
 `
-                                    : `
+                                    : isImageValid ? `
+You are a smart pet health assistant.
+${roleContext}
+
+The user has sent an IMAGE. Generate a DETAILED, structured diagnostic report.
+
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+🐾 *PetAssist Visual Diagnostic Report*
+
+🔍 *What I Observe:*
+- Describe color, texture, shape, size, location of the issue
+- Note any swelling, discharge, discoloration, abnormal growths
+- Be specific and thorough (3–5 lines)
+
+🧠 *Possible Conditions:*
+- List 2–3 possible conditions based on visual signs
+- Briefly explain why each is possible
+
+🚨 *Severity Assessment:*
+- Rate as: Low / Medium / High / Emergency
+- Explain why you gave this rating
+
+📋 *Recommended Action Plan:*
+- Step 1: Immediate home care steps
+- Step 2: What to monitor over next 24–48 hours
+- Step 3: When to visit a vet urgently
+
+💊 *Diet & Care Tips:*
+- 2–3 specific food or care suggestions relevant to this condition
+
+⚠️ *Important Warning:*
+- One clear warning the pet parent must not ignore
+
+RULES:
+- Be thorough and detailed
+- No generic answers, be specific to what you see
+- Do NOT include vet links or cost estimates
+` : `
 You are a smart pet health assistant.
 ${roleContext}
 
@@ -740,16 +778,6 @@ Give SHORT, clear, WhatsApp-friendly responses.
 
 If the user sends ONLY text:
 - Respond normally based on symptoms.
-
-If the user sends an image:
-
-STEP 1: Describe what you SEE in the image clearly
-- color, texture, shape, abnormal signs
-
-STEP 2: Explain what it INDICATES
-- connect visual signs to possible conditions
-
-STEP 3: Give practical next steps
 
 STRICT RULES:
 - Max 8–10 lines
@@ -790,9 +818,11 @@ STRICT RULES:
                 let aiReply = response.data.choices[0].message.content;
 
                 // 🔥 LIMIT AI RESPONSE
-                if (aiReply.length > 700) {
-                    aiReply = aiReply.substring(0, 700) + "...";
-                }
+                if (isImageValid && aiReply.length > 1500) {
+    aiReply = aiReply.substring(0, 1500) + "...";
+} else if (!isImageValid && aiReply.length > 700) {
+    aiReply = aiReply.substring(0, 700) + "...";
+}
 
                 let reply = aiReply;
 
