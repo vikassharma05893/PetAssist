@@ -96,26 +96,26 @@ async function sendTypingIndicator(toNumber, fromNumber) {
 function initUser(fromNumber) {
     if (!userRepo[fromNumber]) {
         userRepo[fromNumber] = {
-            role: null,               // pet_parent | rescuer | veterinarian
-            onboardingStep: "awaiting_role", // Global onboarding step tracker
+            role: null,
+            onboardingStep: "awaiting_role",
             interactionHistory: [],
+            lastActiveAt: null,
+            sessionState: "active",
 
-            // Pet Parent Info
             petInfo: {
                 name: null,
                 age: null,
             },
 
-            // Rescuer Info
             rescuerInfo: {
                 name: null,
                 organizationName: null,
                 location: null,
                 contactNumber: null,
                 animalTypes: null,
+                rescueHistory: [],
             },
 
-            // Veterinarian Info
             vetInfo: {
                 name: null,
                 clinicName: null,
@@ -124,6 +124,7 @@ function initUser(fromNumber) {
                 email: null,
                 specialization: null,
                 clinicHours: null,
+                caseHistory: [],
             },
         };
     }
@@ -219,12 +220,67 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
-        if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-            // Reset user so they can re-onboard
-            initUser(fromNumber);
-            userRepo[fromNumber].onboardingStep = "awaiting_role";
+if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
+    initUser(fromNumber);
+    const user = userRepo[fromNumber];
 
-            const welcome = `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+    // Check idle timeout — 60 seconds
+    const now = Date.now();
+    const isIdle = user.lastActiveAt && (now - user.lastActiveAt) > 60 * 1000;
+
+    // Returning user — onboarding already complete
+    if (user.onboardingStep === "complete") {
+        user.lastActiveAt = now;
+
+        if (user.role === "pet_parent") {
+            return xmlReply(res,
+                `🐾 Welcome back, Pet Parent! How is *${user.petInfo.name}* doing today?
+
+Describe the symptoms or send a photo to get started!`
+            );
+        }
+
+        if (user.role === "rescuer") {
+            user.sessionState = "rescuer_returning";
+            return xmlReply(res,
+                `🦺 Welcome back, *${user.rescuerInfo.name}*!
+
+What would you like to do?
+1️⃣ New rescue case
+2️⃣ View earlier rescue history`
+            );
+        }
+
+        if (user.role === "veterinarian") {
+            user.sessionState = "vet_returning";
+            return xmlReply(res,
+                `🏥 Welcome back, Dr. *${user.vetInfo.name}*!
+
+What would you like to do?
+1️⃣ Start a new patient case
+2️⃣ Review an earlier case file`
+            );
+        }
+    }
+
+    // Idle timeout — session expired, ask to continue or restart
+    if (isIdle) {
+        user.sessionState = "idle_prompt";
+        user.lastActiveAt = now;
+        return xmlReply(res,
+            `⏳ Your session was idle for a while.
+
+Would you like to:
+1️⃣ Continue where you left off
+2️⃣ Start fresh`
+        );
+    }
+
+    // New user — full onboarding
+    user.onboardingStep = "awaiting_role";
+    user.lastActiveAt = now;
+    return xmlReply(res,
+        `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
 
 Your AI-powered pet health companion is here!
 
@@ -234,21 +290,93 @@ Before we get started, please tell me who you are:
 2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
 3️⃣ *Veterinarian* - I am a licensed vet professional
 
-👉 Please reply with *1*, *2*, or *3* to continue.`;
+👉 Please reply with *1*, *2*, or *3* to continue.`
+    );
+}
 
-            return xmlReply(res, welcome);
+        // ================= IDLE PROMPT HANDLER =================
+        if (user.sessionState === "idle_prompt" && ["1", "2"].includes(text)) {
+            if (text === "1") {
+                user.sessionState = "active";
+                user.lastActiveAt = Date.now();
+                return xmlReply(res,
+                    `✅ Continuing your session!
+
+What can I help you with today?`
+                );
+            } else {
+                user.sessionState = "active";
+                user.onboardingStep = "awaiting_role";
+                user.lastActiveAt = Date.now();
+                return xmlReply(res,
+                    `🐾 Starting fresh!
+
+Who are you?
+1️⃣ Pet Parent
+2️⃣ Animal Rescuer
+3️⃣ Veterinarian`
+                );
+            }
         }
 
-        // ================= ROLE SELECTION =================
+// ================= RESCUER RETURNING HANDLER =================
+        if (user.sessionState === "rescuer_returning" && ["1", "2"].includes(text)) {
+            user.sessionState = "active";
+            user.lastActiveAt = Date.now();
+
+            if (text === "1") {
+                return xmlReply(res,
+                    `🦺 *New Rescue Case*
+
+Describe the animal's condition or send a photo for instant triage analysis!`
+                );
+            } else {
+                const history = user.rescuerInfo.rescueHistory;
+                if (!history || history.length === 0) {
+                    return xmlReply(res, `📋 No earlier rescue cases found yet.
+
+Describe a new case or send a photo to get started!`);
+                }
+                const caseList = history.slice(-5).reverse().map((c, i) =>
+                    `${i + 1}. 🕐 ${new Date(c.timestamp).toLocaleString()}\n📝 ${c.userMessage.substring(0, 60)}...`
+                ).join("\n\n");
+                return xmlReply(res, `📋 *Your Recent Rescue Cases:*\n\n${caseList}`);
+            }
+        }
+
+// ================= VET RETURNING HANDLER =================
+        if (user.sessionState === "vet_returning" && ["1", "2"].includes(text)) {
+            user.sessionState = "active";
+            user.lastActiveAt = Date.now();
+
+            if (text === "1") {
+                return xmlReply(res,
+                    `🏥 *New Patient Case*
+
+Describe the patient's symptoms or send a photo for AI-assisted analysis!`
+                );
+            } else {
+                const history = user.vetInfo.caseHistory;
+                if (!history || history.length === 0) {
+                    return xmlReply(res, `📋 No earlier case files found yet.
+
+Describe a new patient or send a photo to get started!`);
+                }
+                const caseList = history.slice(-5).reverse().map((c, i) =>
+                    `${i + 1}. 🕐 ${new Date(c.timestamp).toLocaleString()}\n📝 ${c.userMessage.substring(0, 60)}...`
+                ).join("\n\n");
+                return xmlReply(res, `📋 *Your Recent Case Files:*\n\n${caseList}`);
+            }
+        }
+
+// ================= ROLE SELECTION =================
         if (user.onboardingStep === "awaiting_role" && ["1", "2", "3"].includes(text)) {
             if (text === "1") {
                 user.role = "pet_parent";
                 user.onboardingStep = "pet_awaiting_name";
                 return xmlReply(res,
                     `🐾 *Welcome, Pet Parent!* 🐶🐱
-
 I'm so excited to help keep your furry friend healthy!
-
 First things first...
 🐶 *What's your pet's name?*`
                 );
@@ -257,9 +385,7 @@ First things first...
                 user.onboardingStep = "rescuer_awaiting_name";
                 return xmlReply(res,
                     `🦺 *Welcome, Animal Rescuer!* 🐕🐈
-
 Thank you for the amazing work you do for animals!
-
 Let's get you set up.
 👤 *What is your name?*`
                 );
@@ -268,9 +394,7 @@ Let's get you set up.
                 user.onboardingStep = "vet_awaiting_name";
                 return xmlReply(res,
                     `🏥 *Welcome, Veterinarian!* 🩺
-
 Great to have a medical professional on board!
-
 Let's build your profile.
 👤 *What is your full name?*`
                 );
@@ -673,12 +797,21 @@ STRICT RULES:
                 let reply = aiReply;
 
                 // Update interaction history
-                user.interactionHistory.push({
-                    timestamp: new Date(),
-                    userMessage,
-                    aiReply,
-                    role: user.role,
-                });
+                const historyEntry = {
+    timestamp: new Date(),
+    userMessage,
+    aiReply,
+    role: user.role,
+};
+user.interactionHistory.push(historyEntry);
+user.lastActiveAt = Date.now();
+
+if (user.role === "rescuer") {
+    user.rescuerInfo.rescueHistory.push(historyEntry);
+}
+if (user.role === "veterinarian") {
+    user.vetInfo.caseHistory.push(historyEntry);
+}
 
                 // 🔥 CTA LOGIC
                 if (!isImageValid) {
