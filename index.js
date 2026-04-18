@@ -221,8 +221,14 @@ Upload a clear close-up of both eyes in natural light (no flash)
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
 if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
+    const existingUser = userRepo[fromNumber];
     initUser(fromNumber);
     const user = userRepo[fromNumber];
+
+    // Restore session if user already existed
+    if (existingUser && existingUser.onboardingStep === "complete") {
+        userRepo[fromNumber] = existingUser;
+    }
 
     // Check idle timeout — 60 seconds
     const now = Date.now();
