@@ -179,8 +179,9 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
         }
 
         initUser(fromNumber);
+
         const userId = fromNumber;
-        const user = userRepo[fromNumber];
+        let user = userRepo[fromNumber];
         logQuery(userId, userMessage);
 
         // ================= MEDIA URL EXTRACTION =================
@@ -237,13 +238,14 @@ Upload a clear close-up of both eyes in natural light (no flash)
 if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
     const existingUser = userRepo[fromNumber];
     initUser(fromNumber);
-    const user = userRepo[fromNumber];
 
     // Restore session only if user existed AND onboarding was complete
     if (existingUser && existingUser.onboardingStep === "complete") {
         userRepo[fromNumber] = existingUser;
-        user.lastActiveAt = Date.now();
+        userRepo[fromNumber].lastActiveAt = Date.now();
     }
+
+    user = userRepo[fromNumber];
 
     // Fresh user after exit — go straight to onboarding
     if (!existingUser) {
