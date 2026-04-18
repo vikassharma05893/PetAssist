@@ -155,16 +155,30 @@ app.post("/whatsapp", async (req, res) => {
 
         // ================= USER REPO INIT =================
         let fromNumber = "";
-if (typeof req.body === "string") {
-    const fromMatch = req.body.match(/From=([^&]*)/);
-    if (fromMatch) {
-        fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " ")).trim();
-    }
-} else if (req.body && req.body.From) {
-    fromNumber = req.body.From;
-}
-        initUser(fromNumber);
+        if (typeof req.body === "string") {
+            const fromMatch = req.body.match(/From=([^&]*)/);
+            if (fromMatch) {
+                fromNumber = decodeURIComponent(fromMatch[1].replace(/\+/g, " ")).trim();
+            }
+        } else if (req.body && req.body.From) {
+            fromNumber = req.body.From;
+        }
 
+        // ================= EXIT HANDLER =================
+        if (["exit", "quit", "bye", "restart"].includes(text)) {
+            if (userRepo[fromNumber]) {
+                delete userRepo[fromNumber];
+            }
+            return xmlReply(res,
+                `👋 *Chat Ended!*
+
+Your session has been cleared.
+
+Whenever you're ready to start again, just say *Hi* and we'll get you set up fresh! 🐾`
+            );
+        }
+
+        initUser(fromNumber);
         const userId = fromNumber;
         const user = userRepo[fromNumber];
         logQuery(userId, userMessage);
@@ -457,7 +471,9 @@ You can:
 📝 Describe the symptoms in text
 📸 Send a photo for instant visual analysis
 👁️ Type *eye check* for an eye diagnosis
-🏥 Type *find vet* to locate nearby vets`
+🏥 Type *find vet* to locate nearby vets
+
+💬 Type *exit* anytime to end and restart the chat.`
     );
 }
 
@@ -522,11 +538,13 @@ You can:
 
 You're all set! Do you have an animal that needs help right now?
 
-Tell me about your current rescue case:
+TTell me about your current rescue case:
 📝 Describe the animal's condition or injuries
 📸 Send a photo for instant triage analysis
 👁️ Type *eye check* for eye/wound assessment
-🏥 Type *find vet* to locate nearest emergency vet`
+🏥 Type *find vet* to locate nearest emergency vet
+
+💬 Type *exit* anytime to end and restart the chat.`
     );
 }
 
@@ -615,7 +633,9 @@ What would you like to analyze today?
 📝 Describe a patient's symptoms for differential diagnosis
 📸 Send a patient photo for AI-assisted visual analysis
 👁️ Type *eye check* for ophthalmic case assessment
-💊 Ask about drug dosages or treatment protocols`
+💊 Ask about drug dosages or treatment protocols
+
+💬 Type *exit* anytime to end and restart the chat.`
     );
 }
 
