@@ -164,6 +164,11 @@ app.post("/whatsapp", async (req, res) => {
             fromNumber = req.body.From;
         }
 
+        // ================= DEBUG LOG =================
+        console.log("📞 fromNumber:", fromNumber);
+        console.log("📝 text:", text);
+        console.log("📋 userRepo keys:", Object.keys(userRepo));
+
         // ================= EXIT HANDLER =================
         if (["exit", "quit", "bye", "restart"].includes(text)) {
             if (userRepo[fromNumber]) {
