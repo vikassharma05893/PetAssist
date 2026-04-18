@@ -236,7 +236,10 @@ Upload a clear close-up of both eyes in natural light (no flash)
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
 if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-    const existingUser = userRepo[fromNumber];
+    const existingUser = userRepo[fromNumber] && userRepo[fromNumber].onboardingStep !== "awaiting_role"
+        ? userRepo[fromNumber]
+        : null;
+
     initUser(fromNumber);
 
     // Restore session only if user existed AND onboarding was complete
