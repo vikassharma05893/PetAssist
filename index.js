@@ -153,6 +153,12 @@ app.post("/whatsapp", async (req, res) => {
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
 
+        // ================= GUARD: IGNORE EMPTY MESSAGES =================
+        if (!userMessage || userMessage.length === 0) {
+            res.set("Content-Type", "text/xml");
+            return res.send(`<Response></Response>`);
+        }
+
         // ================= USER REPO INIT =================
         let fromNumber = "";
         if (typeof req.body === "string") {
