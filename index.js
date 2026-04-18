@@ -190,7 +190,6 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
         }
 
         const userId = fromNumber;
-        const preExistingUser = userRepo[fromNumber] ? { ...userRepo[fromNumber] } : null;
         initUser(fromNumber);
         let user = userRepo[fromNumber];
         logQuery(userId, userMessage);
