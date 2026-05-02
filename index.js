@@ -156,8 +156,9 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
 
         // ================= IDLE DETECTION =================
         const now = Date.now();
-        const idleThreshold = 30 * 1000;
-        const isUserIdle = user.lastActiveAt && (now - user.lastActiveAt) > idleThreshold;
+        const idleThreshold = 5 * 60 * 1000; // 5 minutes
+const isUserIdle = user.onboardingStep === "complete" &&
+    user.lastActiveAt && (now - user.lastActiveAt) > idleThreshold;
 
         if (isUserIdle && !["exit", "quit", "bye", "restart", "hi", "hello", "hey"].includes(text)) {
             user.lastActiveAt = now;
