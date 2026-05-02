@@ -245,6 +245,7 @@ Upload a clear close-up of both eyes in natural light (no flash)
 
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
+        console.log("🔍 greeting check:", greetings.some((g) => text.startsWith(g)), "mediaUrl:", mediaUrl);
         if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
             const preExistingUser = userRepo[fromNumber] && userRepo[fromNumber].onboardingStep !== "awaiting_role"
                 ? { ...userRepo[fromNumber] }
