@@ -162,6 +162,7 @@ const isUserIdle = user.onboardingStep === "complete" &&
 
         if (isUserIdle && !["exit", "quit", "bye", "restart", "hi", "hello", "hey"].includes(text)) {
             user.lastActiveAt = now;
+            console.log("🔍 onboardingStep:", user.onboardingStep, "| sessionState:", user.sessionState, "| role:", user.role);
 
             if (user.onboardingStep === "awaiting_role") {
                 return xmlReply(res, `👋 Still there? Just reply *1*, *2*, or *3* to get started with PetAssist! 🐾`);
@@ -268,6 +269,7 @@ const isUserIdle = user.onboardingStep === "complete" &&
         }
 
         user.lastActiveAt = now;
+        console.log("🔍 onboardingStep:", user.onboardingStep, "| sessionState:", user.sessionState, "| role:", user.role);
 
         // ================= MEDIA URL EXTRACTION =================
         let mediaUrl = null;
