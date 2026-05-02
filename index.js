@@ -32,24 +32,6 @@ function xmlReply(res, message) {
     return res.send(`<Response><Message>${message}</Message></Response>`);
 }
 
-// ================= ANALYZE IMAGE FROM URL (PRESERVED) =================
-async function analyzeImageFromUrl(mediaUrl, userMessage, isEyeCheckFlow, vet, cost, food) {
-    try {
-        const { reply, isImageValid } = await analyzeImage({
-            mediaUrl,
-            userMessage,
-            isEyeCheckFlow,
-            vet,
-            cost,
-            food,
-        });
-        return { reply, isImageValid };
-    } catch (error) {
-        console.error("Error analyzing the image:", error);
-        throw new Error("Unable to analyze the image.");
-    }
-}
-
 // ================= DOWNLOAD IMAGE AS BASE64 =================
 async function downloadImageAsBase64(url) {
     try {
@@ -66,29 +48,6 @@ async function downloadImageAsBase64(url) {
     } catch (err) {
         console.log("❌ Image download error:", err.message);
         return null;
-    }
-}
-
-// ================= TYPING SIMULATION VIA TWILIO =================
-async function sendTypingIndicator(toNumber, fromNumber) {
-    try {
-        await axios.post(
-            `https://api.twilio.com/2010-04-01/Accounts/${process.env.TWILIO_SID}/Messages.json`,
-            new URLSearchParams({
-                From: fromNumber,
-                To: toNumber.startsWith("whatsapp:") ? toNumber : `whatsapp:+${toNumber.replace(/^\+/, "")}`,
-                Body: "🐾 PetAssist is analyzing...\n⏳ Please wait a moment.",
-            }),
-            {
-                auth: {
-                    username: process.env.TWILIO_SID,
-                    password: process.env.TWILIO_AUTH_TOKEN,
-                },
-            }
-        );
-        console.log("✅ Typing indicator sent");
-    } catch (err) {
-        console.log("❌ Typing indicator error:", err.response?.data || err.message);
     }
 }
 
@@ -309,7 +268,6 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
 
         user.lastActiveAt = now;
 
-
         // ================= MEDIA URL EXTRACTION =================
         let mediaUrl = null;
         if (typeof req.body === "string") {
@@ -396,7 +354,6 @@ Before we get started, please tell me who you are:
             }
 
             // ================= MID-CONVERSATION HI =================
-            // User said hi while mid-onboarding or mid-session
             if (preExistingUser.onboardingStep !== "complete") {
                 user.sessionState = "mid_convo_prompt";
                 user.lastActiveAt = Date.now();
@@ -530,7 +487,7 @@ Who are you?
             }
         }
 
-// ================= RESCUER RETURNING HANDLER =================
+        // ================= RESCUER RETURNING HANDLER =================
         if (user.sessionState === "rescuer_returning" && ["1", "2"].includes(text)) {
             user.sessionState = "active";
             user.lastActiveAt = Date.now();
@@ -555,9 +512,7 @@ Describe a new case or send a photo to get started!`);
             }
         }
 
-// ================= VET RETURNING HANDLER — handled inside vet dashboard =================
-
-// ================= ROLE SELECTION =================
+        // ================= ROLE SELECTION =================
         if (user.onboardingStep === "awaiting_role" && ["1", "2", "3"].includes(text)) {
             if (text === "1") {
                 user.role = "pet_parent";
@@ -638,7 +593,6 @@ Tap the 📎 attachment icon → Location → Send your current location.`
 
         // STEP 3: Pet Location → Complete onboarding
         if (user.onboardingStep === "pet_awaiting_location") {
-            // Handle WhatsApp location pin
             let latitude = null;
             let longitude = null;
             let locationText = null;
@@ -655,7 +609,6 @@ Tap the 📎 attachment icon → Location → Send your current location.`
                 longitude = req.body.Longitude;
             }
 
-            // If they typed text instead of sharing location
             if (!latitude && userMessage.trim().length > 0) {
                 locationText = userMessage.trim();
             }
@@ -737,11 +690,11 @@ You can:
 
         // STEP 5: Animal Types → Complete onboarding
         if (user.onboardingStep === "rescuer_awaiting_animal_types" && !mediaUrl) {
-    user.rescuerInfo.animalTypes = userMessage.trim();
-    user.onboardingStep = "complete";
+            user.rescuerInfo.animalTypes = userMessage.trim();
+            user.onboardingStep = "complete";
 
-    return xmlReply(res,
-        `✅ *Profile Complete, ${user.rescuerInfo.name}!*
+            return xmlReply(res,
+                `✅ *Profile Complete, ${user.rescuerInfo.name}!*
 
 👤 ${user.rescuerInfo.name} | 🏢 ${user.rescuerInfo.organizationName}
 📍 ${user.rescuerInfo.location} | 🐾 ${user.rescuerInfo.animalTypes}
@@ -755,8 +708,8 @@ Tell me about your current rescue case:
 🏥 Type *find vet* to locate nearest emergency vet
 
 💬 Type *exit* anytime to end and restart the chat.`
-    );
-}
+            );
+        }
 
         // =================================================================
         // ================= VETERINARIAN ONBOARDING FLOW =================
@@ -828,13 +781,13 @@ Tell me about your current rescue case:
 
         // STEP 7: Clinic Hours → Complete onboarding
         if (user.onboardingStep === "vet_awaiting_clinic_hours" && !mediaUrl) {
-    user.vetInfo.clinicHours = userMessage.trim();
-    user.onboardingStep = "complete";
-    user.vetInfo.activeCase = null;
-    user.sessionState = "vet_dashboard";
+            user.vetInfo.clinicHours = userMessage.trim();
+            user.onboardingStep = "complete";
+            user.vetInfo.activeCase = null;
+            user.sessionState = "vet_dashboard";
 
-    return xmlReply(res,
-        `✅ *Profile Complete, Dr. ${user.vetInfo.name}!*
+            return xmlReply(res,
+                `✅ *Profile Complete, Dr. ${user.vetInfo.name}!*
 
 🏥 ${user.vetInfo.clinicName} | 🔬 ${user.vetInfo.specialization}
 
@@ -846,14 +799,13 @@ Welcome to your *Clinical Dashboard*. What would you like to do?
 4️⃣ Generate case summary report
 
 💬 Type *exit* anytime to end and restart the chat.`
-    );
-}
+            );
+        }
 
         // =================================================================
         // ================= MAIN AI ANALYSIS (ALL ROLES) ==================
         // =================================================================
 
-        // Only proceed to AI analysis if onboarding is complete
         if (user.onboardingStep !== "complete") {
             return xmlReply(res,
                 `⚠️ Please complete your profile setup first to continue.
@@ -864,10 +816,8 @@ Reply *Hi* to start over.`
         // ================= VET DASHBOARD HANDLER =================
         if (user.role === "veterinarian") {
 
-            // Show dashboard menu if sessionState is vet_dashboard
             if (user.sessionState === "vet_dashboard" && ["1", "2", "3", "4"].includes(text)) {
 
-                // Option 1: Log new case
                 if (text === "1") {
                     user.sessionState = "vet_case_animal_name";
                     user.vetInfo.activeCase = {};
@@ -879,7 +829,6 @@ Step 1/4: What is the *animal's name and species*?
                     );
                 }
 
-                // Option 2: View case files
                 if (text === "2") {
                     const history = user.vetInfo.caseHistory;
                     if (!history || history.length === 0) {
@@ -897,7 +846,6 @@ Reply *1* to log your first case.`
                     );
                 }
 
-                // Option 3: Drug reference
                 if (text === "3") {
                     user.sessionState = "vet_drug_reference";
                     return xmlReply(res,
@@ -912,7 +860,6 @@ Type a *drug name* or *condition* to look up:
                     );
                 }
 
-                // Option 4: Case summary
                 if (text === "4") {
                     const history = user.vetInfo.caseHistory;
                     if (!history || history.length === 0) {
@@ -932,7 +879,6 @@ Reply *1* to log your first case.`
                 }
             }
 
-            // vet_dashboard but invalid option
             if (user.sessionState === "vet_dashboard") {
                 return xmlReply(res,
                     `🏥 *Clinical Dashboard*
@@ -947,7 +893,6 @@ Please select a valid option:
 
             // ================= VET CASE LOGGING FLOW =================
 
-            // Step 1: Animal name & species
             if (user.sessionState === "vet_case_animal_name") {
                 user.vetInfo.activeCase.animalName = userMessage.split(",")[0]?.trim();
                 user.vetInfo.activeCase.species = userMessage.split(",")[1]?.trim() || "Unknown";
@@ -958,7 +903,6 @@ Please select a valid option:
                 );
             }
 
-            // Step 2: Age & weight
             if (user.sessionState === "vet_case_age_weight") {
                 user.vetInfo.activeCase.ageWeight = userMessage.trim();
                 user.sessionState = "vet_case_complaint";
@@ -967,7 +911,6 @@ Please select a valid option:
                 );
             }
 
-            // Step 3: Chief complaint
             if (user.sessionState === "vet_case_complaint") {
                 user.vetInfo.activeCase.complaint = userMessage.trim();
                 user.sessionState = "vet_case_observations";
@@ -977,7 +920,6 @@ Please select a valid option:
                 );
             }
 
-            // Step 4: Observations → Save case
             if (user.sessionState === "vet_case_observations") {
                 user.vetInfo.activeCase.observations = userMessage.trim();
                 user.vetInfo.activeCase.timestamp = new Date();
@@ -1191,20 +1133,6 @@ What would you like to do?
             );
         }
 
-        // ================= BLOCK VET FROM REACHING HERE =================
-        // Vet is fully handled in vet dashboard block above — safety net only
-        if (user.role === "veterinarian") {
-            return xmlReply(res,
-                `🏥 *Clinical Dashboard*
-
-What would you like to do?
-1️⃣ Log a new patient case
-2️⃣ View & manage case files
-3️⃣ Drug & treatment reference
-4️⃣ Generate case summary report`
-            );
-        }
-
         // ================= FAST ACK =================
         res.set("Content-Type", "text/xml");
         res.send(`<Response><Message>🐾 Got your message!
@@ -1246,7 +1174,7 @@ What would you like to do?
                     console.log("Vet error:", e.message);
                 }
 
-                // ================= AI IMAGE PROCESSING =================
+                // ================= IMAGE PROCESSING =================
                 let imageInput = null;
                 let isImageValid = false;
 
@@ -1408,37 +1336,37 @@ STRICT RULES:
 
                 let aiReply = response.data.choices[0].message.content;
 
-                // 🔥 LIMIT AI RESPONSE
+                // Limit AI response length
                 if (isImageValid && aiReply.length > 1400) {
-    aiReply = aiReply.substring(0, 1400) + "...";
-} else if (!isImageValid && aiReply.length > 700) {
-    aiReply = aiReply.substring(0, 700) + "...";
-}
+                    aiReply = aiReply.substring(0, 1400) + "...";
+                } else if (!isImageValid && aiReply.length > 700) {
+                    aiReply = aiReply.substring(0, 700) + "...";
+                }
 
                 let reply = aiReply;
 
                 // Update interaction history
                 const historyEntry = {
-    timestamp: new Date(),
-    userMessage,
-    aiReply,
-    role: user.role,
-};
-user.interactionHistory.push(historyEntry);
-user.lastActiveAt = Date.now();
+                    timestamp: new Date(),
+                    userMessage,
+                    aiReply,
+                    role: user.role,
+                };
+                user.interactionHistory.push(historyEntry);
+                user.lastActiveAt = Date.now();
 
-if (user.role === "rescuer") {
-    user.rescuerInfo.rescueHistory.push(historyEntry);
-}
+                if (user.role === "rescuer") {
+                    user.rescuerInfo.rescueHistory.push(historyEntry);
+                }
 
-                // 🔥 CTA LOGIC
+                // CTA based on whether image was sent
                 if (!isImageValid) {
                     reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo and I'll analyze it instantly.";
                 } else {
                     reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of the eyes.";
                 }
 
-                // 🔥 PERSONALIZED LABEL BASED ON ROLE
+                // Personalized label based on role
                 let subjectLabel = "";
                 if (user.role === "pet_parent" && user.petInfo?.name) {
                     subjectLabel = ` for *${user.petInfo.name}*`;
@@ -1446,14 +1374,13 @@ if (user.role === "rescuer") {
                     subjectLabel = ` | *Rescue Case*`;
                 }
 
-                // 🔥 DETECT IMAGE + TEXT
                 const isGreeting = text.startsWith("hi") || text.startsWith("hello") || text.startsWith("hey");
                 const isImageWithText = isImageValid &&
                     userMessage &&
                     userMessage.trim().length > 3 &&
                     !["hi", "hello", "hey"].includes(text);
 
-                // 🔥 FINAL FORMAT LOGIC
+                // Final format
                 if (isImageWithText && !isGreeting) {
                     reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
@@ -1478,13 +1405,12 @@ ${vetList}
 ${reply}`;
                 }
 
-                // ================= XML SAFE =================
+                // XML safe
                 reply = reply
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
 
-                // ================= SEND FINAL REPLY =================
                 await sendTwilioMessage(fromNumber, reply);
                 console.log("✅ Reply sent successfully");
 
