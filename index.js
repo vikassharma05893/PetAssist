@@ -1493,6 +1493,13 @@ ${reply}`;
 
             } catch (err) {
                 console.log("❌ Background error:", err.response?.data || err.message);
+                try {
+                    await sendTwilioMessage(fromNumber,
+                        `⚠️ *Something went wrong while analyzing your request.*\n\nPlease try again or rephrase your message. 🐾`
+                    );
+                } catch(e) {
+                    console.log("❌ Failed to send error message:", e.message);
+                }
             }
         }, 0);
 
