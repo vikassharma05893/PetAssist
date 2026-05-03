@@ -406,6 +406,8 @@ Upload a clear close-up of both eyes in natural light (no flash)
         console.log("🔍 greeting check:", greetings.some((g) => text.startsWith(g)), "mediaUrl:", mediaUrl);
         if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
 
+            // Fresh user or cleared session — init first
+            initUser(fromNumber);
             user = userRepo[fromNumber];
 
             // Returning user — onboarding complete
