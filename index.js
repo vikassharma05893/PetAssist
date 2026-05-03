@@ -562,7 +562,7 @@ Who are you?
         }
 
         // ================= RESCUER RETURNING HANDLER =================
-        if (user.sessionState === "rescuer_returning" && ["1", "2"].includes(text)) {
+        if (user.sessionState === "rescuer_returning" && ["1", "2", "3"].includes(text)) {
             user.sessionState = "active";
             user.lastActiveAt = Date.now();
 
@@ -572,7 +572,7 @@ Who are you?
 
 Describe the animal's condition or send a photo for instant triage analysis!`
                 );
-            } else {
+            } else if (text === "2") {
                 const history = user.rescuerInfo.rescueHistory;
                 if (!history || history.length === 0) {
                     return xmlReply(res, `📋 No earlier rescue cases found yet.
@@ -583,6 +583,9 @@ Describe a new case or send a photo to get started!`);
                     `${i + 1}. 🕐 ${new Date(c.timestamp).toLocaleString()}\n📝 ${c.userMessage.substring(0, 60)}...`
                 ).join("\n\n");
                 return xmlReply(res, `📋 *Your Recent Rescue Cases:*\n\n${caseList}`);
+            } else if (text === "3") {
+                user.sessionState = "active";
+                return xmlReply(res, `🏥 Type *find vet* to locate the nearest emergency vet!`);
             }
         }
 
@@ -1207,6 +1210,24 @@ What would you like to do?
 2️⃣ View & manage case files
 3️⃣ Drug & treatment reference
 4️⃣ Generate case summary report`
+            );
+        }
+
+        // ================= RESCUER MENU COMMAND =================
+        if (text === "menu" && user.role === "rescuer" && user.onboardingStep === "complete") {
+            user.sessionState = "rescuer_returning";
+            user.lastActiveAt = Date.now();
+            saveRepo();
+            return xmlReply(res,
+                `🦺 *Rescuer Dashboard*
+
+What would you like to do?
+━━━━━━━━━━━━━━━
+[ 1 ] 🆕 New rescue case
+[ 2 ] 📋 View rescue history
+[ 3 ] 🏥 Find nearest vet
+━━━━━━━━━━━━━━━
+_Type *exit* to end session._`
             );
         }
 
