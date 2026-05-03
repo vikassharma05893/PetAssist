@@ -157,17 +157,36 @@ app.post("/whatsapp", async (req, res) => {
 
         // ================= EXIT HANDLER =================
         if (["exit", "quit", "bye", "restart"].includes(text)) {
-            if (userRepo[fromNumber]) {
+            if (userRepo[fromNumber] && userRepo[fromNumber].sessionState !== "exit_confirm") {
+                userRepo[fromNumber].sessionState = "exit_confirm";
+                saveRepo();
+                return xmlReply(res,
+                    `⚠️ *Are you sure you want to end the chat?*
+
+Your profile and history will be cleared.
+
+Reply *yes* to confirm or *no* to continue.`
+                );
+            }
+        }
+
+        // ================= EXIT CONFIRM HANDLER =================
+        if (user && user.sessionState === "exit_confirm") {
+            if (text === "yes") {
                 delete userRepo[fromNumber];
-saveRepo();
-}
-return xmlReply(res,
-    `👋 *Chat Ended!*
+                saveRepo();
+                return xmlReply(res,
+                    `👋 *Chat Ended!*
 
 Your session has been cleared.
 
-Whenever you're ready to start again, just say *Hi* and we'll get you set up fresh! 🐾`
-            );
+Say *Hi* anytime to start fresh! 🐾`
+                );
+            } else {
+                user.sessionState = "active";
+                saveRepo();
+                return xmlReply(res, `✅ *Glad you're staying!* Just continue where you left off. 🐾`);
+            }
         }
 
         const userId = fromNumber;
