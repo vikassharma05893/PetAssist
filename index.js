@@ -481,9 +481,11 @@ Upload a clear close-up of both eyes in natural light (no flash)
         user.onboardingStep = "awaiting_role";
         user.lastActiveAt = Date.now();
         saveRepo();
-        return xmlReply(res,
+        res.set("Content-Type", "text/xml");
+        res.send(`<Response></Response>`);
+        try {
+            await sendTwilioMessage(fromNumber,
                 `🐾 *Woof! Hello there, I'm PetAssist!* 🐶🐱✨
-
 _Your AI-powered pet health companion is here!_
 
 ━━━━━━━━━━━━━━━━━━━━
@@ -501,6 +503,10 @@ _I am a licensed vet professional_
 ━━━━━━━━━━━━━━━━━━━━
 👉 _Reply with *1*, *2* or *3* to continue_`
             );
+        } catch(e) {
+            console.log("❌ Failed to send welcome message:", e.message);
+        }
+        return;
         }
 
 
