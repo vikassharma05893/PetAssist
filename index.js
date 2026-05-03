@@ -171,11 +171,17 @@ Your profile and history will be cleared.
 
 Reply *yes* to confirm or *no* to continue.`
                 );
+            } else if (!userRepo[fromNumber]) {
+                return xmlReply(res,
+                    `👋 No active session found.
+
+Say *Hi* anytime to start fresh! 🐾`
+                );
             }
         }
 
         // ================= EXIT CONFIRM HANDLER =================
-        if (user && user.sessionState === "exit_confirm") {
+        if (userRepo[fromNumber] && userRepo[fromNumber].sessionState === "exit_confirm") {
             if (text === "yes") {
                 delete userRepo[fromNumber];
                 saveRepo();
@@ -186,8 +192,8 @@ Your session has been cleared.
 
 Say *Hi* anytime to start fresh! 🐾`
                 );
-            } else {
-                user.sessionState = "active";
+            } else if (text === "no") {
+                userRepo[fromNumber].sessionState = "active";
                 saveRepo();
                 return xmlReply(res, `✅ *Glad you're staying!* Just continue where you left off. 🐾`);
             }
