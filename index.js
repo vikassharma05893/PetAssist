@@ -405,25 +405,81 @@ Upload a clear close-up of both eyes in natural light (no flash)
         const greetings = ["hi", "hello", "hey"];
         console.log("🔍 greeting check:", greetings.some((g) => text.startsWith(g)), "mediaUrl:", mediaUrl);
         if (greetings.some((g) => text.startsWith(g)) && !mediaUrl) {
-            const preExistingUser = userRepo[fromNumber] && userRepo[fromNumber].onboardingStep !== "awaiting_role"
-                ? { ...userRepo[fromNumber] }
-                : null;
-
-            initUser(fromNumber);
-
-            if (preExistingUser && preExistingUser.onboardingStep === "complete") {
-                userRepo[fromNumber] = preExistingUser;
-                userRepo[fromNumber].lastActiveAt = Date.now();
-            }
 
             user = userRepo[fromNumber];
 
-            // Fresh user — show welcome
-            if (!preExistingUser) {
-                user.onboardingStep = "awaiting_role";
+            // Returning user — onboarding complete
+            if (user && user.onboardingStep === "complete") {
                 user.lastActiveAt = Date.now();
+                saveRepo();
+
+                if (user.role === "pet_parent") {
+                    return xmlReply(res,
+                        `🐾 Welcome back! How is *${user.petInfo.name}* doing today?
+
+👇 *What would you like to do?*
+━━━━━━━━━━━━━━━
+1️⃣ 🩺 Describe symptoms
+2️⃣ 📸 Send a photo
+3️⃣ 👁️ Eye check
+4️⃣ 🏥 Find a vet
+━━━━━━━━━━━━━━━`
+                    );
+                }
+
+                if (user.role === "rescuer") {
+                    user.sessionState = "rescuer_returning";
+                    saveRepo();
+                    return xmlReply(res,
+                        `🦺 Welcome back, *${user.rescuerInfo.name}*!
+
+👇 *What would you like to do?*
+━━━━━━━━━━━━━━━
+1️⃣ 🆕 New rescue case
+2️⃣ 📋 View rescue history
+3️⃣ 🏥 Find nearest vet
+━━━━━━━━━━━━━━━`
+                    );
+                }
+
+                if (user.role === "veterinarian") {
+                    user.sessionState = "vet_returning";
+                    saveRepo();
+                    return xmlReply(res,
+                        `🏥 Welcome back, Dr. *${user.vetInfo.name}*!
+
+👇 *What would you like to do?*
+━━━━━━━━━━━━━━━
+1️⃣ Start a new patient case
+2️⃣ Review an earlier case file
+━━━━━━━━━━━━━━━`
+                    );
+                }
+            }
+
+            // Mid onboarding — user said hi
+            if (user && user.onboardingStep !== "awaiting_role" && user.onboardingStep !== "complete") {
+                user.sessionState = "mid_convo_prompt";
+                user.lastActiveAt = Date.now();
+                saveRepo();
                 return xmlReply(res,
-                    `🐾 *Woof! Hello there, I'm PetAssist!* 🐶🐱✨
+                    `👋 Looks like we were in the middle of setting up your profile!
+
+━━━━━━━━━━━━━━━
+1️⃣ ▶️ Continue where I left off
+2️⃣ 🔄 Start fresh
+━━━━━━━━━━━━━━━`
+                );
+            }
+
+            // Fresh user or cleared session
+            initUser(fromNumber);
+            user = userRepo[fromNumber];
+            user.onboardingStep = "awaiting_role";
+            user.lastActiveAt = Date.now();
+            saveRepo();
+            return xmlReply(res,
+                `🐾 *Woof! Hello there, I'm PetAssist!* 🐶🐱✨
 
 _Your AI-powered pet health companion is here!_
 
@@ -441,8 +497,8 @@ _I am a licensed vet professional_
 
 ━━━━━━━━━━━━━━━━━━━━
 👉 _Reply with *1*, *2* or *3* to continue_`
-                );
-            }
+            );
+        }
 
             // ================= MID-CONVERSATION HI =================
             if (preExistingUser.onboardingStep !== "complete") {
@@ -1334,7 +1390,23 @@ _Type *exit* to end session._`
             );
         }
 
-        // ================= FAST ACK =================
+        // ================= UNIVERSAL FALLBACK =================
+        if (user.onboardingStep === "complete" && user.role === "pet_parent") {
+            // Pet parent said something unrecognized — treat as symptom description
+            // falls through to fast ack + AI analysis below
+        } else if (user.onboardingStep === "complete" && user.role === "rescuer") {
+            // Rescuer said something unrecognized — treat as rescue case
+            // falls through to fast ack + AI analysis below
+        } else if (user.onboardingStep !== "complete") {
+            // Stuck mid onboarding — guide them
+            return xmlReply(res,
+                `👋 Looks like something went wrong.
+
+Reply *Hi* to start fresh or *1* to continue where you left off.`
+            );
+        }
+
+// ================= FAST ACK =================
         res.set("Content-Type", "text/xml");
         res.send(`<Response><Message>🐾 Got your message!
 ⏳ Analyzing now... please wait a moment.</Message></Response>`);
