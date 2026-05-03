@@ -6,7 +6,27 @@ const { getRecommendations, extractLocation } = require("./logic");
 const getNearbyVets = require("./vets");
 
 const app = express();
-const userRepo = {}; // In-memory user data repository
+const userRepo = {};
+const fs = require("fs");
+const REPO_FILE = "./userRepo.json";
+
+if (fs.existsSync(REPO_FILE)) {
+    try {
+        const saved = JSON.parse(fs.readFileSync(REPO_FILE, "utf8"));
+        Object.assign(userRepo, saved);
+        console.log("✅ Sessions restored:", Object.keys(userRepo).length);
+    } catch(e) {
+        console.log("⚠️ Could not restore sessions:", e.message);
+    }
+}
+
+function saveRepo() {
+    try {
+        fs.writeFileSync(REPO_FILE, JSON.stringify(userRepo, null, 2));
+    } catch(e) {
+        console.log("⚠️ Could not save sessions:", e.message);
+    }
+}
 
 // ================= HELPER: SEND TWILIO MESSAGE =================
 async function sendTwilioMessage(toNumber, body) {
@@ -139,9 +159,10 @@ app.post("/whatsapp", async (req, res) => {
         if (["exit", "quit", "bye", "restart"].includes(text)) {
             if (userRepo[fromNumber]) {
                 delete userRepo[fromNumber];
-            }
-            return xmlReply(res,
-                `👋 *Chat Ended!*
+saveRepo();
+}
+return xmlReply(res,
+    `👋 *Chat Ended!*
 
 Your session has been cleared.
 
@@ -150,8 +171,10 @@ Whenever you're ready to start again, just say *Hi* and we'll get you set up fre
         }
 
         const userId = fromNumber;
-        initUser(fromNumber);
-        let user = userRepo[fromNumber];
+        const isNewUser = !userRepo[fromNumber];
+initUser(fromNumber);
+if (isNewUser) saveRepo();
+let user = userRepo[fromNumber];
         try { logQuery(userId, userMessage); } catch(e) { console.log("logQuery error:", e.message); }
 
         // ================= IDLE DETECTION =================
@@ -623,9 +646,10 @@ Tap the 📎 attachment icon → Location → Send your current location.`
             const petName = user.petInfo.name;
             const petAge = user.petInfo.age;
             user.onboardingStep = "complete";
+saveRepo();
 
-            return xmlReply(res,
-                `✅ *Profile Complete!*
+return xmlReply(res,
+    `✅ *Profile Complete!*
 
 🐾 Pet: *${petName}* | Age: *${petAge}*
 📍 Location saved!
@@ -695,9 +719,10 @@ You can:
         if (user.onboardingStep === "rescuer_awaiting_animal_types" && !mediaUrl) {
             user.rescuerInfo.animalTypes = userMessage.trim();
             user.onboardingStep = "complete";
+saveRepo();
 
-            return xmlReply(res,
-                `✅ *Profile Complete, ${user.rescuerInfo.name}!*
+return xmlReply(res,
+    `✅ *Profile Complete, ${user.rescuerInfo.name}!*
 
 👤 ${user.rescuerInfo.name} | 🏢 ${user.rescuerInfo.organizationName}
 📍 ${user.rescuerInfo.location} | 🐾 ${user.rescuerInfo.animalTypes}
@@ -786,7 +811,8 @@ Tell me about your current rescue case:
         if (user.onboardingStep === "vet_awaiting_clinic_hours" && !mediaUrl) {
             user.vetInfo.clinicHours = userMessage.trim();
             user.onboardingStep = "complete";
-            user.vetInfo.activeCase = null;
+saveRepo();
+user.vetInfo.activeCase = null;
             user.sessionState = "vet_dashboard";
 
             return xmlReply(res,
