@@ -475,12 +475,13 @@ Upload a clear close-up of both eyes in natural light (no flash)
             }
 
             // Fresh user or cleared session
-            initUser(fromNumber);
-            user = userRepo[fromNumber];
-            user.onboardingStep = "awaiting_role";
-            user.lastActiveAt = Date.now();
-            saveRepo();
-            return xmlReply(res,
+        console.log("🆕 Sending fresh welcome message");
+        initUser(fromNumber);
+        user = userRepo[fromNumber];
+        user.onboardingStep = "awaiting_role";
+        user.lastActiveAt = Date.now();
+        saveRepo();
+        return xmlReply(res,
                 `🐾 *Woof! Hello there, I'm PetAssist!* 🐶🐱✨
 
 _Your AI-powered pet health companion is here!_
