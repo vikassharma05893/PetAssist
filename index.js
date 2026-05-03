@@ -83,7 +83,11 @@ function initUser(fromNumber) {
 
             petInfo: {
                 name: null,
+                species: null,
+                breed: null,
                 age: null,
+                gender: null,
+                neutered: null,
                 location: null,
             },
 
@@ -647,35 +651,119 @@ Reply with *1*, *2*, or *3*.`
 
         // STEP 1: Pet Name
         if (user.onboardingStep === "pet_awaiting_name" && !mediaUrl) {
-            const petName = userMessage.trim();
-            user.petInfo.name = petName;
+            user.petInfo.name = userMessage.trim();
+            user.onboardingStep = "pet_awaiting_species";
+            return xmlReply(res,
+                `🐾 *${user.petInfo.name}* — what a fantastic name! 🐾
+
+🐾 *What type of pet is ${user.petInfo.name}?*
+━━━━━━━━━━━━━━━
+1️⃣ 🐶 Dog
+2️⃣ 🐱 Cat
+3️⃣ 🐦 Bird
+4️⃣ 🐇 Rabbit
+5️⃣ 🐾 Other
+━━━━━━━━━━━━━━━
+_Reply with 1, 2, 3, 4 or 5_`
+            );
+        }
+
+        // STEP 2: Pet Species
+        if (user.onboardingStep === "pet_awaiting_species" && !mediaUrl) {
+            const speciesMap = { "1": "Dog", "2": "Cat", "3": "Bird", "4": "Rabbit", "5": "Other" };
+            user.petInfo.species = speciesMap[text] || userMessage.trim();
+
+            if (text === "5") {
+                user.onboardingStep = "pet_awaiting_species_other";
+                return xmlReply(res,
+                    `🐾 What animal is *${user.petInfo.name}?*
+_(e.g. Hamster, Turtle, Guinea Pig, Snake)_`
+                );
+            }
+
+            const breedHints = {
+                "Dog": "e.g. Labrador, German Shepherd, Indie, Golden Retriever",
+                "Cat": "e.g. Persian, Siamese, Indie, Maine Coon",
+                "Bird": "e.g. Parrot, Budgie, Cockatiel, Mynah",
+                "Rabbit": "e.g. Dutch, Angora, Lionhead",
+            };
+
+            user.onboardingStep = "pet_awaiting_breed";
+            return xmlReply(res,
+                `Got it! *${user.petInfo.species}* 🐾
+
+🦴 *What breed is ${user.petInfo.name}?*
+_${breedHints[user.petInfo.species]}_
+
+_Not sure? Just type "Mixed" or "Not sure"_`
+            );
+        }
+
+        // STEP 2.5: Other Species
+        if (user.onboardingStep === "pet_awaiting_species_other" && !mediaUrl) {
+            user.petInfo.species = userMessage.trim();
+            user.onboardingStep = "pet_awaiting_breed";
+            return xmlReply(res,
+                `Got it! *${user.petInfo.species}* 🐾
+
+🦴 *What breed is ${user.petInfo.name}?*
+_(e.g. Hamster, Turtle, Guinea Pig or type "Not sure")_`
+            );
+        }
+
+        // STEP 3: Pet Breed
+        if (user.onboardingStep === "pet_awaiting_breed" && !mediaUrl) {
+            user.petInfo.breed = userMessage.trim();
             user.onboardingStep = "pet_awaiting_age";
-
             return xmlReply(res,
-                `🐾 *${petName}* — what a fantastic name! 🐾
-
-How old is *${petName}*?
-(e.g. 2 years, 6 months)`
+                `🎂 *How old is ${user.petInfo.name}?*
+_(e.g. 2 years, 8 months, 2 years 4 months)_`
             );
         }
 
-        // STEP 2: Pet Age
+        // STEP 4: Pet Age
         if (user.onboardingStep === "pet_awaiting_age" && !mediaUrl) {
-            const petAge = userMessage.trim();
-            const petName = user.petInfo.name;
-            user.petInfo.age = petAge;
-            user.onboardingStep = "pet_awaiting_location";
-
+            user.petInfo.age = userMessage.trim();
+            user.onboardingStep = "pet_awaiting_gender";
             return xmlReply(res,
-                `🐾 Got it! *${petName}*, ${petAge} old — noted! 🐶
-
-📍 One last thing! Please share your *location* so I can find nearby vets for *${petName}*!
-
-Tap the 📎 attachment icon → Location → Send your current location.`
+                `⚧ *What is ${user.petInfo.name}'s gender?*
+━━━━━━━━━━━━━━━
+1️⃣ 🐾 Male
+2️⃣ 🌸 Female
+━━━━━━━━━━━━━━━`
             );
         }
 
-        // STEP 3: Pet Location → Complete onboarding
+        // STEP 5: Pet Gender
+        if (user.onboardingStep === "pet_awaiting_gender" && !mediaUrl) {
+            user.petInfo.gender = text === "1" ? "Male" : text === "2" ? "Female" : userMessage.trim();
+            user.onboardingStep = "pet_awaiting_neutered";
+            const neuteredWord = user.petInfo.gender === "Female" ? "Spayed" : "Neutered";
+            return xmlReply(res,
+                `✂️ *Is ${user.petInfo.name} ${neuteredWord}?*
+━━━━━━━━━━━━━━━
+1️⃣ ✅ Yes
+2️⃣ ❌ No
+3️⃣ 🤷 Not Sure
+━━━━━━━━━━━━━━━`
+            );
+        }
+
+        // STEP 6: Neutered/Spayed
+        if (user.onboardingStep === "pet_awaiting_neutered" && !mediaUrl) {
+            const neuteredMap = { "1": "Yes", "2": "No", "3": "Not Sure" };
+            user.petInfo.neutered = neuteredMap[text] || userMessage.trim();
+            user.onboardingStep = "pet_awaiting_location";
+            return xmlReply(res,
+                `📍 *Almost done! Please share your location*
+so I can find nearby vets for *${user.petInfo.name}*!
+
+_Tap 📎 → Location → Send current location_
+_Or just type your city name_`
+            );
+        }
+
+        // STEP 7: Pet Location → Complete onboarding
         if (user.onboardingStep === "pet_awaiting_location") {
             let latitude = null;
             let longitude = null;
@@ -701,27 +789,29 @@ Tap the 📎 attachment icon → Location → Send your current location.`
                 ? { latitude, longitude, type: "pin" }
                 : { text: locationText, type: "text" };
 
-            const petName = user.petInfo.name;
-            const petAge = user.petInfo.age;
             user.onboardingStep = "complete";
-saveRepo();
+            saveRepo();
 
-return xmlReply(res,
-    `✅ *Profile Complete!*
+            const neuteredWord = user.petInfo.gender === "Female" ? "Spayed" : "Neutered";
 
-🐾 Pet: *${petName}* | Age: *${petAge}*
-📍 Location saved!
+            return xmlReply(res,
+                `✅ *${user.petInfo.name}'s Profile is Ready!*
+━━━━━━━━━━━━━━━
+🐾 *Name:* ${user.petInfo.name}
+🐶 *Species:* ${user.petInfo.species}
+🦴 *Breed:* ${user.petInfo.breed}
+🎂 *Age:* ${user.petInfo.age}
+⚧ *Gender:* ${user.petInfo.gender}
+✂️ *${neuteredWord}:* ${user.petInfo.neutered}
+📍 *Location:* Saved
+━━━━━━━━━━━━━━━
 
-Welcome aboard, Pet Parent! I'm ready to assist *${petName}*. 🐶💛
+👇 *What would you like to do?*
 
-What's bothering *${petName}* today?
-You can:
-📝 Describe the symptoms in text
-📸 Send a photo for instant visual analysis
-👁️ Type *eye check* for an eye diagnosis
-🏥 Type *find vet* to locate nearby vets
-
-💬 Type *exit* anytime to end and restart the chat.`
+1️⃣ 🩺 Describe symptoms
+2️⃣ 📸 Send a photo
+3️⃣ 👁️ Eye check
+4️⃣ 🏥 Find a vet`
             );
         }
 
@@ -1303,7 +1393,7 @@ _Type *exit* to end session._`
                 // ================= ROLE-BASED SYSTEM PROMPT =================
                 const roleContext = user.role === "rescuer"
                     ? `The user is an animal rescuer (${user.rescuerInfo.name}, ${user.rescuerInfo.organizationName}). Focus on first-aid, triage, and emergency guidance.`
-                    : `The user is a pet parent. Their pet's name is ${user.petInfo?.name || "unknown"}, age ${user.petInfo?.age || "unknown"}. Use simple, friendly language.`;
+                    : `The user is a pet parent. Pet details — Name: ${user.petInfo?.name || "unknown"}, Species: ${user.petInfo?.species || "unknown"}, Breed: ${user.petInfo?.breed || "unknown"}, Age: ${user.petInfo?.age || "unknown"}, Gender: ${user.petInfo?.gender || "unknown"}, Neutered/Spayed: ${user.petInfo?.neutered || "unknown"}. Use simple, friendly language.`;
 
                 // ================= OPENAI API CALL =================
                 const response = await axios.post(
