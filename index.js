@@ -413,17 +413,24 @@ Upload a clear close-up of both eyes in natural light (no flash)
                 user.onboardingStep = "awaiting_role";
                 user.lastActiveAt = Date.now();
                 return xmlReply(res,
-                    `🐾 *Woof! Hello there! I'm PetAssist!* 🐶🐱✨
+                    `🐾 *Woof! Hello there, I'm PetAssist!* 🐶🐱✨
 
-Your AI-powered pet health companion is here!
+_Your AI-powered pet health companion is here!_
 
-Before we get started, please tell me who you are:
+━━━━━━━━━━━━━━━━━━━━
+👇 *Tell me who you are:*
 
-1️⃣ *Pet Parent* - I have a pet and need health guidance
-2️⃣ *Animal Rescuer* - I rescue and rehabilitate animals
-3️⃣ *Veterinarian* - I am a licensed vet professional
+1️⃣ 🐾 *Pet Parent*
+_I have a pet & need health guidance_
 
-👉 Please reply with *1*, *2*, or *3* to continue.`
+2️⃣ 🦺 *Animal Rescuer*
+_I rescue & rehabilitate animals_
+
+3️⃣ 🏥 *Veterinarian*
+_I am a licensed vet professional_
+
+━━━━━━━━━━━━━━━━━━━━
+👉 _Reply with *1*, *2* or *3* to continue_`
                 );
             }
 
