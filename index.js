@@ -343,6 +343,35 @@ Upload a clear close-up of both eyes in natural light (no flash)
             return xmlReply(res, eyeGuide);
         }
 
+        // ================= FIND VET COMMAND =================
+        if (text === "find vet" && user.onboardingStep === "complete") {
+            let location = null;
+            if (user.role === "pet_parent" && user.petInfo.location) {
+                location = user.petInfo.location.type === "pin"
+                    ? `${user.petInfo.location.latitude},${user.petInfo.location.longitude}`
+                    : user.petInfo.location.text;
+            } else if (user.role === "rescuer" && user.rescuerInfo.location) {
+                location = user.rescuerInfo.location;
+            }
+
+            if (!location) {
+                return xmlReply(res, `📍 Please share your *location* first so I can find nearby vets!\n\nTap 📎 → Location → Send current location.`);
+            }
+
+            try {
+                const vets = await getNearbyVets(location);
+                if (!vets || vets.length === 0) {
+                    return xmlReply(res, `⚠️ No nearby vets found for your location. Try typing your city name.`);
+                }
+                const vetList = vets.slice(0, 5).map((v, i) =>
+                    `${i + 1}. 🏥 *${v.name}* (⭐ ${v.rating})\n📍 maps.google.com/?q=${encodeURIComponent(v.name)}`
+                ).join("\n\n");
+                return xmlReply(res, `🏥 *Nearby Vets:*\n\n${vetList}\n\n_Reply *find vet* anytime to refresh this list._`);
+            } catch(e) {
+                return xmlReply(res, `⚠️ Could not fetch vets right now. Please try again shortly.`);
+            }
+        }
+
         // ================= GREETING → RESET & SHOW ROLE SELECTION =================
         const greetings = ["hi", "hello", "hey"];
         console.log("🔍 greeting check:", greetings.some((g) => text.startsWith(g)), "mediaUrl:", mediaUrl);
