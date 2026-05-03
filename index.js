@@ -1430,10 +1430,16 @@ STRICT RULES:
                     role: user.role,
                 };
                 user.interactionHistory.push(historyEntry);
+                if (user.interactionHistory.length > 50) {
+                    user.interactionHistory = user.interactionHistory.slice(-50);
+                }
                 user.lastActiveAt = Date.now();
 
                 if (user.role === "rescuer") {
                     user.rescuerInfo.rescueHistory.push(historyEntry);
+                    if (user.rescuerInfo.rescueHistory.length > 50) {
+                        user.rescuerInfo.rescueHistory = user.rescuerInfo.rescueHistory.slice(-50);
+                    }
                 }
 
                 // CTA based on whether image was sent
