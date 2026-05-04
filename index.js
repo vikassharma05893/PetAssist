@@ -6,25 +6,50 @@ const { getRecommendations, extractLocation } = require("./logic");
 const getNearbyVets = require("./vets");
 
 const app = express();
-const userRepo = {};
-const fs = require("fs");
-const REPO_FILE = "./userRepo.json";
+const { Redis } = require("@upstash/redis");
+const redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
 
-if (fs.existsSync(REPO_FILE)) {
+const userRepo = {};
+
+// Load all sessions from Redis on startup
+(async () => {
     try {
-        const saved = JSON.parse(fs.readFileSync(REPO_FILE, "utf8"));
-        Object.assign(userRepo, saved);
-        console.log("✅ Sessions restored:", Object.keys(userRepo).length);
+        const keys = await redis.keys("user:*");
+        if (keys.length > 0) {
+            const values = await redis.mget(...keys);
+            keys.forEach((key, i) => {
+                const userId = key.replace("user:", "");
+                if (values[i]) userRepo[userId] = values[i];
+            });
+            console.log("✅ Sessions restored from Redis:", Object.keys(userRepo).length);
+        } else {
+            console.log("✅ Redis connected, no existing sessions");
+        }
     } catch(e) {
-        console.log("⚠️ Could not restore sessions:", e.message);
+        console.log("⚠️ Could not restore sessions from Redis:", e.message);
+    }
+})();
+
+async function saveRepo() {
+    // Save all current users to Redis
+    try {
+        for (const userId of Object.keys(userRepo)) {
+            await redis.set(`user:${userId}`, userRepo[userId]);
+        }
+    } catch(e) {
+        console.log("⚠️ Could not save to Redis:", e.message);
     }
 }
 
-function saveRepo() {
+async function deleteUserFromRepo(userId) {
     try {
-        fs.writeFileSync(REPO_FILE, JSON.stringify(userRepo, null, 2));
+        delete userRepo[userId];
+        await redis.del(`user:${userId}`);
     } catch(e) {
-        console.log("⚠️ Could not save sessions:", e.message);
+        console.log("⚠️ Could not delete from Redis:", e.message);
     }
 }
 
@@ -191,8 +216,7 @@ Say *Hi* anytime to start fresh! 🐾`
         // ================= EXIT CONFIRM HANDLER =================
         if (userRepo[fromNumber] && userRepo[fromNumber].sessionState === "exit_confirm") {
             if (text === "yes") {
-                delete userRepo[fromNumber];
-                saveRepo();
+                await deleteUserFromRepo(fromNumber);
                 return xmlReply(res,
                     `👋 *Chat Ended!*
 
