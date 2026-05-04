@@ -137,10 +137,18 @@ app.post("/whatsapp", async (req, res) => {
         userMessage = userMessage.trim();
         const text = userMessage.toLowerCase();
 
-        // ================= GUARD: IGNORE EMPTY MESSAGES =================
-        if (!userMessage || userMessage.length === 0) {
+        // ================= GUARD: IGNORE EMPTY MESSAGES (allow if media) =================
+        const hasMedia = (typeof req.body === "string" && req.body.includes("MediaUrl0=")) ||
+                         (req.body && (req.body.MediaUrl0 || req.body.MediaUrl));
+
+        if ((!userMessage || userMessage.length === 0) && !hasMedia) {
             res.set("Content-Type", "text/xml");
             return res.send(`<Response></Response>`);
+        }
+
+        // If image without caption, set default message
+        if ((!userMessage || userMessage.length === 0) && hasMedia) {
+            userMessage = "Please analyze this image";
         }
 
         // ================= USER REPO INIT =================
