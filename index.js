@@ -1604,9 +1604,9 @@ STRICT RULES:
 
                 let aiReply = response.data.choices[0].message.content;
 
-                // Limit AI response length
-                if (isImageValid && aiReply.length > 1400) {
-                    aiReply = aiReply.substring(0, 1400) + "...";
+                // Limit AI response length (Twilio max is 1600 chars total)
+                if (isImageValid && aiReply.length > 900) {
+                    aiReply = aiReply.substring(0, 900) + "...";
                 } else if (!isImageValid && aiReply.length > 700) {
                     aiReply = aiReply.substring(0, 700) + "...";
                 }
@@ -1684,6 +1684,11 @@ ${reply}`;
                     .replace(/&/g, "&amp;")
                     .replace(/</g, "&lt;")
                     .replace(/>/g, "&gt;");
+
+                // Final safety: enforce Twilio 1600 char limit
+                if (reply.length > 1550) {
+                    reply = reply.substring(0, 1550) + "...";
+                }
 
                 await sendTwilioMessage(fromNumber, reply);
                 console.log("✅ Reply sent successfully");
