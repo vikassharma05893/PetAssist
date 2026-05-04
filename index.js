@@ -1317,7 +1317,43 @@ _Type *exit* to end session._`
             );
         }
 
-        // ================= UNIVERSAL FALLBACK =================
+        // ================= PET PARENT ACTION MENU =================
+        if (user.role === "pet_parent" && user.onboardingStep === "complete" && ["1", "2", "3", "4"].includes(text)) {
+            if (text === "1") {
+                return xmlReply(res,
+                    `🩺 *Tell me about ${user.petInfo.name}'s symptoms*
+
+Describe what's bothering them — when did it start, what have you noticed?
+
+The more detail, the better the diagnosis. 🐾`
+                );
+            }
+            if (text === "2") {
+                return xmlReply(res,
+                    `📸 *Send a photo of ${user.petInfo.name}*
+
+Upload a clear, well-lit picture of the affected area for instant visual analysis.
+
+_Tap 📎 → Camera/Gallery → Send_`
+                );
+            }
+            if (text === "3") {
+                return xmlReply(res,
+                    `👁️ *Eye Check for ${user.petInfo.name}*
+
+Type *eye check* to start the guided eye diagnosis flow.`
+                );
+            }
+            if (text === "4") {
+                return xmlReply(res,
+                    `🏥 *Find a Vet*
+
+Type *find vet* to see nearest vets to your saved location.`
+                );
+            }
+        }
+
+// ================= UNIVERSAL FALLBACK =================
         if (user.onboardingStep === "complete" && user.role === "pet_parent") {
             // Pet parent said something unrecognized — treat as symptom description
             // falls through to fast ack + AI analysis below
