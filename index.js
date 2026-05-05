@@ -1349,6 +1349,53 @@ _Type *exit* to end session._`
             );
         }
 
+// ================= POST ANALYSIS MENU HANDLER =================
+        if (user.role === "pet_parent" && user.sessionState === "post_analysis_menu" && ["1", "2", "3"].includes(text)) {
+            user.sessionState = "active";
+            saveRepo();
+
+            if (text === "1") {
+                return xmlReply(res,
+                    `📸 *Send a photo of ${user.petInfo.name}*
+
+Upload a clear, well-lit picture of the affected area for instant visual analysis.
+
+_Tap 📎 → Camera/Gallery → Send_`
+                );
+            }
+            if (text === "2") {
+                let location = user.petInfo.location?.type === "pin"
+                    ? `${user.petInfo.location.latitude},${user.petInfo.location.longitude}`
+                    : user.petInfo.location?.text;
+
+                if (!location) {
+                    return xmlReply(res, `📍 Please share your location first to find nearby vets.`);
+                }
+
+                try {
+                    const vets = await getNearbyVets(location);
+                    if (!vets || vets.length === 0) {
+                        return xmlReply(res, `⚠️ No nearby vets found.`);
+                    }
+                    const vetList = vets.slice(0, 5).map((v, i) =>
+                        `${i + 1}. 🏥 *${v.name}* (⭐ ${v.rating})\n📍 maps.google.com/?q=${encodeURIComponent(v.name)}`
+                    ).join("\n\n");
+                    return xmlReply(res, `🏥 *Nearby Vets:*\n\n${vetList}`);
+                } catch(e) {
+                    return xmlReply(res, `⚠️ Could not fetch vets right now.`);
+                }
+            }
+            if (text === "3") {
+                return xmlReply(res,
+                    `💬 *Tell me more about ${user.petInfo.name}*
+
+Share any extra details — eating habits, behavior changes, recent food/activity, when symptoms started, etc.
+
+The more context, the better the diagnosis. 🐾`
+                );
+            }
+        }
+
         // ================= PET PARENT ACTION MENU =================
         if (user.role === "pet_parent" && user.onboardingStep === "complete" && ["1", "2", "3", "4"].includes(text)) {
             if (text === "1") {
@@ -1635,6 +1682,7 @@ STRICT RULES:
 
                 // CTA based on whether image was sent
                 if (!isImageValid) {
+                    user.sessionState = "post_analysis_menu";
                     reply += `\n\n━━━━━━━━━━━━━━━
 👇 *What's next?*
 1️⃣ 📷 Send a photo for visual analysis
