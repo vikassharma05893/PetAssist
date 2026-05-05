@@ -108,11 +108,19 @@ async function classifyIntent(userMessage) {
                         role: "system",
                         content: `You are an intent classifier. Analyze the user's message and respond with ONLY one of these exact words: find_vet, send_photo, add_details, new_symptom, other.
 
+CONTEXT: User just got AI analysis. They are responding to a menu with these options:
+1️⃣ Send a photo for visual analysis
+2️⃣ Find nearby vets
+3️⃣ Add more details about symptoms
+
 Rules:
-- "find_vet" → user wants to find/locate vets, doctors, clinics, hospitals (e.g., "2", "find vet", "vet near me", "doctor", "where to take")
-- "send_photo" → user says they will send a photo/picture (e.g., "1", "send photo", "I'll send pic", "let me upload")
-- "add_details" → user provides MORE info about same issue (e.g., "3", "she's also vomiting", "started yesterday", "more details")
-- "new_symptom" → user describes a NEW pet health issue/symptom (e.g., "my cat won't eat", "he's limping", paragraph about pet)
+- If user types just "1" → ALWAYS classify as "send_photo"
+- If user types just "2" → ALWAYS classify as "find_vet"
+- If user types just "3" → ALWAYS classify as "add_details"
+- "find_vet" → finding vets, doctors, clinics (e.g., "find vet", "vet near me", "doctor")
+- "send_photo" → user wants to send/upload a photo (e.g., "send photo", "I'll send pic", "let me upload")
+- "add_details" → user provides MORE info about same issue (e.g., "she's also vomiting", "started yesterday")
+- "new_symptom" → user describes a completely NEW pet health issue (full sentence about new problem)
 - "other" → anything else
 
 Reply with ONE WORD only.`
