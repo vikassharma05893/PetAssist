@@ -96,6 +96,47 @@ async function downloadImageAsBase64(url) {
     }
 }
 
+// ================= INTENT CLASSIFIER (uses GPT-4o-mini) =================
+async function classifyIntent(userMessage) {
+    try {
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-4o-mini",
+                messages: [
+                    {
+                        role: "system",
+                        content: `You are an intent classifier. Analyze the user's message and respond with ONLY one of these exact words: find_vet, send_photo, add_details, new_symptom, other.
+
+Rules:
+- "find_vet" → user wants to find/locate vets, doctors, clinics, hospitals (e.g., "2", "find vet", "vet near me", "doctor", "where to take")
+- "send_photo" → user says they will send a photo/picture (e.g., "1", "send photo", "I'll send pic", "let me upload")
+- "add_details" → user provides MORE info about same issue (e.g., "3", "she's also vomiting", "started yesterday", "more details")
+- "new_symptom" → user describes a NEW pet health issue/symptom (e.g., "my cat won't eat", "he's limping", paragraph about pet)
+- "other" → anything else
+
+Reply with ONE WORD only.`
+                    },
+                    { role: "user", content: userMessage }
+                ],
+                max_tokens: 10,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+        const intent = response.data.choices[0].message.content.trim().toLowerCase();
+        console.log("🧠 Intent classified:", intent);
+        return intent;
+    } catch(e) {
+        console.log("⚠️ Intent classification failed:", e.message);
+        return "other";
+    }
+}
+
 // ================= INIT USER REPO =================
 function initUser(fromNumber) {
     if (!userRepo[fromNumber]) {
@@ -1349,21 +1390,13 @@ _Type *exit* to end session._`
             );
         }
 
-// ================= POST ANALYSIS MENU HANDLER =================
-        if (user.role === "pet_parent" && user.sessionState === "post_analysis_menu" && ["1", "2", "3"].includes(text)) {
-            user.sessionState = "active";
-            saveRepo();
+// ================= POST ANALYSIS MENU HANDLER (Intent-Based) =================
+        if (user.role === "pet_parent" && user.sessionState === "post_analysis_menu" && !mediaUrl) {
+            const intent = await classifyIntent(userMessage);
 
-            if (text === "1") {
-                return xmlReply(res,
-                    `📸 *Send a photo of ${user.petInfo.name}*
-
-Upload a clear, well-lit picture of the affected area for instant visual analysis.
-
-_Tap 📎 → Camera/Gallery → Send_`
-                );
-            }
-            if (text === "2") {
+            if (intent === "find_vet") {
+                user.sessionState = "active";
+                saveRepo();
                 let location = user.petInfo.location?.type === "pin"
                     ? `${user.petInfo.location.latitude},${user.petInfo.location.longitude}`
                     : user.petInfo.location?.text;
@@ -1371,7 +1404,6 @@ _Tap 📎 → Camera/Gallery → Send_`
                 if (!location) {
                     return xmlReply(res, `📍 Please share your location first to find nearby vets.`);
                 }
-
                 try {
                     const vets = await getNearbyVets(location);
                     if (!vets || vets.length === 0) {
@@ -1385,13 +1417,34 @@ _Tap 📎 → Camera/Gallery → Send_`
                     return xmlReply(res, `⚠️ Could not fetch vets right now.`);
                 }
             }
-            if (text === "3") {
+
+            if (intent === "send_photo") {
+                user.sessionState = "active";
+                saveRepo();
                 return xmlReply(res,
-                    `💬 *Tell me more about ${user.petInfo.name}*
+                    `📸 *Send a photo of ${user.petInfo.name}*
 
-Share any extra details — eating habits, behavior changes, recent food/activity, when symptoms started, etc.
+Upload a clear, well-lit picture of the affected area for instant visual analysis.
 
-The more context, the better the diagnosis. 🐾`
+_Tap 📎 → Camera/Gallery → Send_`
+                );
+            }
+
+            if (intent === "add_details" || intent === "new_symptom") {
+                // Reset state and let it flow to AI analysis below
+                user.sessionState = "active";
+                saveRepo();
+                // Don't return — let it fall through to AI analysis
+            } else if (intent === "other") {
+                user.sessionState = "active";
+                saveRepo();
+                return xmlReply(res,
+                    `🐾 I can help you with:
+- 📸 Send a photo for analysis
+- 🏥 Find nearby vets
+- 💬 Describe symptoms
+
+What would you like?`
                 );
             }
         }
