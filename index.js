@@ -1403,7 +1403,7 @@ _Type *exit* to end session._`
             const intent = await classifyIntent(userMessage);
 
             if (intent === "find_vet") {
-                user.sessionState = "active";
+                // Keep state for follow-up actions
                 saveRepo();
                 let location = user.petInfo.location?.type === "pin"
                     ? `${user.petInfo.location.latitude},${user.petInfo.location.longitude}`
@@ -1427,7 +1427,7 @@ _Type *exit* to end session._`
             }
 
             if (intent === "send_photo") {
-                user.sessionState = "active";
+                // Keep state for follow-up actions
                 saveRepo();
                 return xmlReply(res,
                     `📸 *Send a photo of ${user.petInfo.name}*
