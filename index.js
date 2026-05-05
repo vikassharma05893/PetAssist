@@ -1635,7 +1635,12 @@ STRICT RULES:
 
                 // CTA based on whether image was sent
                 if (!isImageValid) {
-                    reply += "\n\n📸 Want a more accurate diagnosis?\nSend a photo and I'll analyze it instantly.";
+                    reply += `\n\n━━━━━━━━━━━━━━━
+👇 *What's next?*
+1️⃣ 📷 Send a photo for visual analysis
+2️⃣ 🏥 Find nearby vets
+3️⃣ 💬 Add more details about symptoms
+━━━━━━━━━━━━━━━`;
                 } else {
                     reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of the eyes.";
                 }
@@ -1667,12 +1672,7 @@ ${vetList}
                 } else if (!isImageValid) {
                     reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
-${reply}
-
-━━━━━━━━━━━━━━━
-🏥 *Nearby Vets:*
-${vetList}
-━━━━━━━━━━━━━━━`;
+${reply}`;
                 } else {
                     reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
