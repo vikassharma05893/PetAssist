@@ -1715,9 +1715,9 @@ STRICT RULES:
                     }
                 }
 
-                // CTA based on whether image was sent
+                // CTA — same 3-option menu after both text and image responses
+                user.sessionState = "post_analysis_menu";
                 if (!isImageValid) {
-                    user.sessionState = "post_analysis_menu";
                     reply += `\n\n━━━━━━━━━━━━━━━
 👇 *What's next?*
 1️⃣ 📷 Send a photo for visual analysis
@@ -1725,7 +1725,12 @@ STRICT RULES:
 3️⃣ 💬 Add more details about symptoms
 ━━━━━━━━━━━━━━━`;
                 } else {
-                    reply += "\n\n👁️ Want a deeper diagnosis?\nReply *eye check* or send a photo of the eyes.";
+                    reply += `\n\n━━━━━━━━━━━━━━━
+👇 *What's next?*
+1️⃣ 👁️ Eye check (send eye photo)
+2️⃣ 🏥 Find nearby vets
+3️⃣ 💬 Share more details
+━━━━━━━━━━━━━━━`;
                 }
 
                 // Personalized label based on role
@@ -1746,12 +1751,7 @@ STRICT RULES:
                 if (isImageWithText && !isGreeting) {
                     reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
-${reply}
-
-━━━━━━━━━━━━━━━
-🏥 *Nearby Vets:*
-${vetList}
-━━━━━━━━━━━━━━━`;
+${reply}`;
                 } else if (!isImageValid) {
                     reply = `🐾 *PetAssist Analysis*${subjectLabel}
 
