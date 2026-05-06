@@ -1639,14 +1639,19 @@ RULES:
 - Be thorough and detailed
 - No generic answers, be specific to what you see
 - Do NOT include vet links or cost estimates
+
+END WITH ONE SMART CONTEXTUAL QUESTION based on severity:
+- LOW severity → ask for context: "💬 How long has this been there?"
+- MEDIUM severity → suggest action: "💬 Want me to find a vet, or want to share more details?"
+- HIGH/EMERGENCY → urgent: "🚨 This looks serious. Should I find the nearest emergency vet right now?"
+
+Format the question like: "💬 [your question]" or "🚨 [urgent question]"
+Do NOT show numbered menus. Be conversational.
 ` : `
 You are a smart pet health assistant.
 ${roleContext}
 
 Give SHORT, clear, WhatsApp-friendly responses.
-
-If the user sends ONLY text:
-- Respond normally based on symptoms.
 
 STRICT RULES:
 - Max 8–10 lines
@@ -1662,12 +1667,16 @@ STRICT RULES:
 📋 What to do:
 - 2–4 bullet points
 
-🏥 Vet: ${vet}
-💰 Cost: ${cost}
-🍗 Food: ${food}
-
 ⚠️ Warning:
 1 short line
+
+END WITH ONE SMART CONTEXTUAL QUESTION based on severity:
+- LOW severity → ask for more details: "💬 When did this start? / Anything else unusual?"
+- MEDIUM severity → suggest vet: "💬 Want me to find a nearby vet, or shall we monitor first?"
+- HIGH/EMERGENCY → urgent vet: "🚨 This needs urgent care. Should I find the nearest emergency vet right now?"
+
+Format the question like: "💬 [your question]"
+Do NOT show numbered menus. Be conversational, like a caring vet friend.
 `,
                             },
                             {
@@ -1715,23 +1724,8 @@ STRICT RULES:
                     }
                 }
 
-                // CTA — same 3-option menu after both text and image responses
+                // Set state for intent-based routing of next user message
                 user.sessionState = "post_analysis_menu";
-                if (!isImageValid) {
-                    reply += `\n\n━━━━━━━━━━━━━━━
-👇 *What's next?*
-1️⃣ 📷 Send a photo for visual analysis
-2️⃣ 🏥 Find nearby vets
-3️⃣ 💬 Add more details about symptoms
-━━━━━━━━━━━━━━━`;
-                } else {
-                    reply += `\n\n━━━━━━━━━━━━━━━
-👇 *What's next?*
-1️⃣ 👁️ Eye check (send eye photo)
-2️⃣ 🏥 Find nearby vets
-3️⃣ 💬 Share more details
-━━━━━━━━━━━━━━━`;
-                }
 
                 // Personalized label based on role
                 let subjectLabel = "";
