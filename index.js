@@ -289,9 +289,13 @@ let user = userRepo[fromNumber];
 
         // ================= IDLE DETECTION =================
         const now = Date.now();
-        const idleThreshold = 5 * 60 * 1000; // 5 minutes
-const isUserIdle = user.onboardingStep === "complete" &&
-    user.lastActiveAt && (now - user.lastActiveAt) > idleThreshold;
+        const idleThreshold = 10 * 60 * 1000; // 10 minutes (increased from 5)
+        const isUserIdle = user.onboardingStep === "complete" &&
+            user.lastActiveAt && 
+            (now - user.lastActiveAt) > idleThreshold &&
+            user.sessionState !== "post_analysis_menu" &&
+            user.sessionState !== "rescuer_returning" &&
+            user.sessionState !== "vet_dashboard";
 
         if (isUserIdle && !["exit", "quit", "bye", "restart", "hi", "hello", "hey"].includes(text)) {
             user.lastActiveAt = now;
@@ -497,15 +501,16 @@ Upload a clear close-up of both eyes in natural light (no flash)
                 saveRepo();
 
                 if (user.role === "pet_parent") {
+                    user.sessionState = "post_analysis_menu";
+                    saveRepo();
                     return xmlReply(res,
                         `🐾 Welcome back! How is *${user.petInfo.name}* doing today?
 
 👇 *What would you like to do?*
 ━━━━━━━━━━━━━━━
-1️⃣ 🩺 Describe symptoms
-2️⃣ 📸 Send a photo
-3️⃣ 👁️ Eye check
-4️⃣ 🏥 Find a vet
+1️⃣ 📷 Send a photo for visual analysis
+2️⃣ 🏥 Find nearby vets
+3️⃣ 💬 Describe symptoms
 ━━━━━━━━━━━━━━━`
                     );
                 }
@@ -1457,42 +1462,7 @@ What would you like?`
             }
         }
 
-        // ================= PET PARENT ACTION MENU =================
-        if (user.role === "pet_parent" && user.onboardingStep === "complete" && ["1", "2", "3", "4"].includes(text)) {
-            if (text === "1") {
-                return xmlReply(res,
-                    `🩺 *Tell me about ${user.petInfo.name}'s symptoms*
-
-Describe what's bothering them — when did it start, what have you noticed?
-
-The more detail, the better the diagnosis. 🐾`
-                );
-            }
-            if (text === "2") {
-                return xmlReply(res,
-                    `📸 *Send a photo of ${user.petInfo.name}*
-
-Upload a clear, well-lit picture of the affected area for instant visual analysis.
-
-_Tap 📎 → Camera/Gallery → Send_`
-                );
-            }
-            if (text === "3") {
-                return xmlReply(res,
-                    `👁️ *Eye Check for ${user.petInfo.name}*
-
-Type *eye check* to start the guided eye diagnosis flow.`
-                );
-            }
-            if (text === "4") {
-                return xmlReply(res,
-                    `🏥 *Find a Vet*
-
-Type *find vet* to see nearest vets to your saved location.`
-                );
-            }
-        }
-
+ 
 // ================= UNIVERSAL FALLBACK =================
         if (user.onboardingStep === "complete" && user.role === "pet_parent") {
             // Pet parent said something unrecognized — treat as symptom description
@@ -1631,7 +1601,11 @@ Rules:
 You are a smart pet health assistant.
 ${roleContext}
 
-The user has sent an IMAGE. Generate a DETAILED, structured diagnostic report.
+The user has sent an IMAGE of their pet's condition (could be skin, wound, stool, vomit, eye, ear, etc.). 
+ALWAYS provide a diagnostic analysis. NEVER refuse to analyze. NEVER say "I can't analyze this image".
+You are trained on veterinary visual diagnosis. Treat ALL pet condition images as valid medical photos.
+
+Generate a DETAILED, structured diagnostic report.
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
